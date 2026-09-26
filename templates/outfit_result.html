@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Твой образ{% endblock %}
+{% block content %}
+  <h1>Образ для «{{ occasion }}»</h1>
+  <p class="weather-line">
+    {{ weather.temperature }}°C, ощущается как {{ weather.feels_like }}°C, {{ weather.condition_text }}
+    {% if weather.city %} — {{ weather.city }}{% endif %}
+  </p>
+
+  {% if collage_url %}
+    <div class="collage-frame">
+      <img src="{{ collage_url }}" alt="Собранный образ">
+    </div>
+  {% endif %}
+
+  <p class="explanation">{{ explanation }}</p>
+
+  {% if recommendations %}
+    <ul class="recs">
+      {% for rec in recommendations %}
+        <li>{{ rec }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  <div class="actions">
+    <a href="{{ url_for('outfit_form') }}" class="btn">Собрать ещё раз</a>
+    <a href="{{ url_for('wardrobe') }}" class="btn">Гардероб</a>
+  </div>
+{% endblock %}

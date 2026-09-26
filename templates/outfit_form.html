@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Собрать образ{% endblock %}
+{% block content %}
+  <h1>Куда собираешься?</h1>
+
+  {% if error %}<div class="error-box">{{ error }}</div>{% endif %}
+
+  <form class="stack" method="POST" id="outfit-form">
+    <div>
+      <label for="occasion">Повод</label>
+      <input type="text" id="occasion" name="occasion" placeholder="например: собеседование, свидание, прогулка" required>
+    </div>
+
+    <input type="hidden" id="lat" name="lat">
+    <input type="hidden" id="lon" name="lon">
+
+    <button type="button" id="geo-btn" class="btn">📍 Использовать мою геолокацию</button>
+    <div id="geo-status" style="font-size: 0.88rem; color: var(--ink-soft);"></div>
+
+    <div class="divider-or">или укажи город вручную</div>
+
+    <div>
+      <label for="city">Город</label>
+      <input type="text" id="city" name="city" placeholder="Таллинн">
+    </div>
+
+    <button type="submit" class="btn primary">Собрать образ</button>
+  </form>
+
+  <script>
+    document.getElementById('geo-btn').addEventListener('click', function () {
+      const status = document.getElementById('geo-status');
+      if (!navigator.geolocation) {
+        status.textContent = 'Геолокация не поддерживается браузером — укажи город вручную.';
+        return;
+      }
+      status.textContent = 'Определяем местоположение...';
+      navigator.geolocation.getCurrentPosition(
+        function (pos) {
+          document.getElementById('lat').value = pos.coords.latitude;
+          document.getElementById('lon').value = pos.coords.longitude;
+          document.getElementById('city').value = '';
+          status.textContent = 'Готово — геолокация будет использована.';
+        },
+        function () {
+          status.textContent = 'Не удалось получить геолокацию — укажи город вручную.';
+        }
+      );
+    });
+  </script>
+{% endblock %}

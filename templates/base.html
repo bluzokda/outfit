@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Лук{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="shell">
+    <nav class="top">
+      <a href="{{ url_for('index') }}" class="brand">Лук</a>
+      <div class="links">
+        <a href="{{ url_for('wardrobe') }}">Гардероб</a>
+        <a href="{{ url_for('outfit_form') }}">Собрать образ</a>
+      </div>
+    </nav>
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

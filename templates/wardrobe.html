@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Гардероб{% endblock %}
+{% block content %}
+  <h1>Гардероб</h1>
+  <p class="lede">{{ items|length }} {{ 'вещь' if items|length == 1 else 'вещей' }} сохранено.</p>
+
+  <div class="actions">
+    <a href="{{ url_for('add_item') }}" class="btn primary">Добавить вещь</a>
+  </div>
+
+  {% if items %}
+    <div class="grid-items">
+      {% for item in items %}
+        <div class="item-card">
+          <img src="/{{ item.photo_path }}" alt="{{ category_labels.get(item.category, item.category) }}">
+          <div class="meta">
+            <span class="tag">{{ category_labels.get(item.category, item.category) }}</span>
+            {% if item.description %}<div>{{ item.description }}</div>{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state">Пока пусто. Добавь первую вещь, чтобы образы собирались из твоего гардероба.</div>
+  {% endif %}
+{% endblock %}

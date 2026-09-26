@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Добавить вещь{% endblock %}
+{% block content %}
+  <h1>Добавить вещь</h1>
+
+  {% if error %}<div class="error-box">{{ error }}</div>{% endif %}
+
+  <form class="stack" method="POST" enctype="multipart/form-data">
+    <div>
+      <label for="photo">Фото вещи</label>
+      <input type="file" id="photo" name="photo" accept="image/*" required>
+    </div>
+    <div>
+      <label for="category">Категория</label>
+      <select id="category" name="category" required>
+        {% for value, label in category_labels.items() %}
+          <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="description">Описание (цвет, материал, стиль) — необязательно</label>
+      <textarea id="description" name="description" placeholder="например: белая рубашка из хлопка, оверсайз"></textarea>
+    </div>
+    <button type="submit" class="btn primary">Сохранить</button>
+  </form>
+{% endblock %}
