@@ -23,6 +23,8 @@ CATEGORY_LABELS = {
     "accessory": "Аксессуар",
 }
 
+init_db()
+
 
 def get_session_id() -> str:
     """Каждому браузеру — свой session_id в cookie, чтобы разделять гардеробы."""
@@ -123,5 +125,4 @@ def outfit_form():
 
 
 if __name__ == "__main__":
-    init_db()
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=False)
