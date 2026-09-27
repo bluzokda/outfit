@@ -42,7 +42,7 @@ def _call_gemini(prompt: str, schema: dict) -> dict:
             "Content-Type": "application/json",
         },
         json={
-            "model": "gemini-3.8-flash",
+            "model": "gemini-3.5-flash-lite",
             "input": prompt,
             "response_format": {
                 "type": "text",
