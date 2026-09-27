@@ -1,5 +1,6 @@
 import os
 import uuid
+import traceback
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.utils import secure_filename
@@ -75,64 +76,69 @@ def delete_item(item_id):
 @app.route("/outfit", methods=["GET", "POST"])
 def outfit_form():
     if request.method == "POST":
-        occasion = request.form.get("occasion", "").strip()
-        lat = request.form.get("lat")
-        lon = request.form.get("lon")
-        city_name = request.form.get("city", "").strip()
-
-        if not occasion:
-            return render_template("outfit_form.html", error="Укажи повод")
-
-        if lat and lon:
-            weather = get_weather(float(lat), float(lon))
-        elif city_name:
-            geo = geocode_city(city_name)
-            if geo is None:
-                return render_template("outfit_form.html", error="Город не найден, попробуй ещё раз")
-            glat, glon, full_name = geo
-            weather = get_weather(glat, glon, city=full_name)
-        else:
-            return render_template("outfit_form.html", error="Укажи город или разреши геолокацию")
-
-        session_id = get_session_id()
-        wardrobe_items = get_wardrobe(session_id)
-        
         try:
+            occasion = request.form.get("occasion", "").strip()
+            lat = request.form.get("lat")
+            lon = request.form.get("lon")
+            city_name = request.form.get("city", "").strip()
+
+            if not occasion:
+                return render_template("outfit_form.html", error="Укажи повод")
+
+            if lat and lon:
+                weather = get_weather(float(lat), float(lon))
+            elif city_name:
+                geo = geocode_city(city_name)
+                if geo is None:
+                    return render_template("outfit_form.html", error="Город не найден, попробуй ещё раз")
+                glat, glon, full_name = geo
+                weather = get_weather(glat, glon, city=full_name)
+            else:
+                return render_template("outfit_form.html", error="Укажи город или разреши геолокацию")
+
+            session_id = get_session_id()
+            wardrobe_items = get_wardrobe(session_id)
+            
+            # Генерация образа
             result = build_outfit(occasion, weather, wardrobe_items)
-        except Exception as e:
-            return render_template(
-                "outfit_form.html", 
-                error="Сервер генерации образов временно перегружен (ошибка 503 от Google API). Попробуй нажать кнопку ещё раз через пару секунд."
+
+            collage_url = None
+            collage_path = None
+            if result.item_ids:
+                selected = [i for i in wardrobe_items if i["id"] in result.item_ids]
+                photo_paths = [i["photo_path"] for i in selected]
+                collage_path = build_collage(photo_paths)
+                if collage_path:
+                    collage_url = "/" + collage_path.replace(os.sep, "/")
+
+            save_outfit_history(
+                session_id=session_id,
+                occasion=occasion,
+                city=weather.city,
+                temperature=weather.temperature,
+                weather_condition=weather.condition_text,
+                item_ids=result.item_ids,
+                collage_path=collage_path if result.item_ids else None,
+                explanation=result.explanation,
             )
 
-        collage_url = None
-        collage_path = None
-        if result.item_ids:
-            selected = [i for i in wardrobe_items if i["id"] in result.item_ids]
-            photo_paths = [i["photo_path"] for i in selected]
-            collage_path = build_collage(photo_paths)
-            if collage_path:
-                collage_url = "/" + collage_path.replace(os.sep, "/")
-
-        save_outfit_history(
-            session_id=session_id,
-            occasion=occasion,
-            city=weather.city,
-            temperature=weather.temperature,
-            weather_condition=weather.condition_text,
-            item_ids=result.item_ids,
-            collage_path=collage_path if result.item_ids else None,
-            explanation=result.explanation,
-        )
-
-        return render_template(
-            "outfit_result.html",
-            weather=weather,
-            occasion=occasion,
-            explanation=result.explanation,
-            collage_url=collage_url,
-            recommendations=result.generic_recommendations,
-        )
+            return render_template(
+                "outfit_result.html",
+                weather=weather,
+                occasion=occasion,
+                explanation=result.explanation,
+                collage_url=collage_url,
+                recommendations=result.generic_recommendations,
+            )
+        except Exception as e:
+            # Вывод подробного текста ошибки на экран
+            error_details = traceback.format_exc()
+            return f"""
+            <div style="padding: 30px; font-family: monospace; background: #ffe6e6; color: #990000; border: 2px solid #ff9999; margin: 40px; border-radius: 10px;">
+                <h2 style="margin-top: 0;">⚠️ Ошибка при генерации образа:</h2>
+                <pre style="white-space: pre-wrap; word-break: break-all; background: #fff; padding: 15px; border-radius: 5px; border: 1px solid #ffcccc;">{error_details}</pre>
+            </div>
+            """, 500
 
     return render_template("outfit_form.html")
 
