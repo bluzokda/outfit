@@ -7,60 +7,96 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(15px); }
-            to { opacity: 1; transform: translateY(0); }
+            from { opacity: 0; transform: translateY(20px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
         @keyframes floatBg {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
         }
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
         .animate-fade-in {
-            animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            animation: fadeIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .animate-pulse-slow {
+            animation: pulseGlow 6s ease-in-out infinite;
         }
         body {
-            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-            background-size: 200% 200%;
-            animation: floatBg 15s ease infinite;
+            background: linear-gradient(135deg, #070514, #181032, #0d091e, #1f123d);
+            background-size: 300% 300%;
+            animation: floatBg 20s ease infinite;
             color: #f3f4f6;
             min-height: 100vh;
             font-family: system-ui, -apple-system, sans-serif;
+            overflow-x: hidden;
         }
+        /* Сложный стекломорфизм с неоновой подсветкой */
         .glass-panel {
-            background: rgba(30, 27, 75, 0.65);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(139, 92, 246, 0.2);
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            background: rgba(20, 16, 45, 0.75);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(168, 85, 247, 0.25);
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .glass-panel:hover {
+            border-color: rgba(168, 85, 247, 0.45);
+            box-shadow: 0 16px 50px 0 rgba(107, 33, 168, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
         }
         .neon-glow {
-            box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+            box-shadow: 0 0 25px rgba(168, 85, 247, 0.5);
+            transition: all 0.3s ease;
         }
         .neon-glow:hover {
-            box-shadow: 0 0 30px rgba(168, 85, 247, 0.7);
+            box-shadow: 0 0 35px rgba(168, 85, 247, 0.8), 0 0 10px rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px);
+        }
+        /* Эффект шума/сетки на фоне */
+        .bg-mesh {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            opacity: 0.15;
+            background-image: radial-gradient(rgba(168, 85, 247, 0.4) 1px, transparent 1px);
+            background-size: 32px 32px;
         }
     </style>
 </head>
 <body class="flex flex-col min-h-screen selection:bg-purple-500 selection:text-white">
+    <div class="bg-mesh"></div>
+
+    <!-- Декоративные световые пятна на фоне -->
+    <div class="fixed top-1/4 left-10 w-96 h-96 bg-purple-600/15 rounded-full blur-3xl pointer-events-none animate-pulse-slow"></div>
+    <div class="fixed bottom-10 right-10 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none animate-pulse-slow" style="animation-delay: 3s;"></div>
+
     <header class="glass-panel sticky top-0 z-50 border-b border-purple-900/40">
-        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
-            <a href="/" class="text-xl font-extrabold bg-gradient-to-r from-purple-400 via-indigo-300 to-blue-400 bg-clip-text text-transparent hover:opacity-80 transition">
-                ✨ AI Stylist
+        <div class="max-w-5xl mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="/" class="text-xl font-black tracking-tight bg-gradient-to-r from-purple-400 via-indigo-300 to-pink-400 bg-clip-text text-transparent hover:opacity-80 transition flex items-center gap-2">
+                <span class="inline-block animate-spin" style="animation-duration: 8s;">✨</span> AI Stylist
             </a>
-            <nav class="flex gap-2 sm:gap-4">
-                <a href="/" class="px-3 py-2 rounded-xl text-sm font-medium hover:bg-purple-900/40 transition text-purple-200">Главная</a>
-                <a href="/wardrobe" class="px-3 py-2 rounded-xl text-sm font-medium hover:bg-purple-900/40 transition text-purple-200">Гардероб</a>
-                <a href="/outfit" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 text-white neon-glow transition transform hover:-translate-y-0.5">Собрать образ</a>
+            <nav class="flex gap-2 sm:gap-4 items-center">
+                <a href="/" class="px-3.5 py-2 rounded-xl text-sm font-medium hover:bg-purple-800/40 transition text-purple-200">Главная</a>
+                <a href="/wardrobe" class="px-3.5 py-2 rounded-xl text-sm font-medium hover:bg-purple-800/40 transition text-purple-200">Гардероб</a>
+                <a href="/outfit" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 text-white neon-glow">Собрать образ</a>
             </nav>
         </div>
     </header>
 
-    <main class="flex-grow max-w-5xl w-full mx-auto px-4 py-8 animate-fade-in">
+    <main class="flex-grow max-w-5xl w-full mx-auto px-6 py-10 animate-fade-in relative z-10">
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="text-center py-6 text-xs text-purple-400/60 border-t border-purple-900/20">
-        AI Wardrobe & Outfit Assistant • Сияй в любом образе
+    <footer class="text-center py-8 text-xs text-purple-400/60 border-t border-purple-900/20 relative z-10">
+        AI Wardrobe & Outfit Assistant • Сияй в любом образе 🔮
     </footer>
 </body>
 </html>
