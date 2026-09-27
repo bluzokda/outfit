@@ -55,16 +55,24 @@ def geocode_city(city_name: str) -> tuple[float, float, str] | None:
     try:
         resp = requests.get(
             config.geocoding_api_url,
-            params={"name": city_name, "count": 1, "language": "ru"},
+            params={"name": city_name, "count": 5, "language": "ru"},
             timeout=10,
         )
         data = resp.json()
         results = data.get("results")
         if not results:
             return None
-        r = results[0]
-        full_name = f"{r['name']}, {r.get('country', '')}".strip(", ")
-        return r["latitude"], r["longitude"], full_name
+        
+        # Ищем в приоритете город из России или СНГ, либо берем первый попавшийся
+        best_r = results[0]
+        for r in results:
+            country = r.get("country", "")
+            if country in ["Россия", "Russia", "Беларусь", "Kazakhstan", "Казахстан"]:
+                best_r = r
+                break
+
+        full_name = f"{best_r['name']}, {best_r.get('country', '')}".strip(", ")
+        return best_r["latitude"], best_r["longitude"], full_name
     except Exception:
         return None
 
@@ -87,6 +95,8 @@ def get_weather(lat: float, lon: float, city: str | None = None) -> WeatherInfo:
                 "latitude": lat,
                 "longitude": lon,
                 "current": "temperature_2m,apparent_temperature,wind_speed_10m,precipitation,weather_code",
+                "temperature_unit": "celsius",          # Явно указываем градусы Цельсия
+                "wind_speed_unit": "ms",               # Метры в секунду
             },
             timeout=10,
         )
