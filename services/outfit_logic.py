@@ -32,15 +32,14 @@ def _items_to_prompt_list(items):
 
 
 def _call_gemini(prompt: str, schema: dict) -> dict:
-    """Запрос к Gemini через официальный API генерации контента с JSON-ответом."""
-    # Используем проверенную стабильную модель gemini-1.5-flash
-    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={config.gemini_api_key}"
+    """Прямой запрос к стабильной модели Gemini 1.5 Flash."""
+    # Используем проверенный рабочий эндпоинт Google API
+    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
     
     response = requests.post(
         api_url,
-        headers={
-            "Content-Type": "application/json",
-        },
+        params={"key": config.gemini_api_key},
+        headers={"Content-Type": "application/json"},
         json={
             "contents": [{
                 "parts": [{"text": prompt}]
