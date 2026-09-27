@@ -52,38 +52,59 @@ class WeatherInfo:
 
 
 def geocode_city(city_name: str) -> tuple[float, float, str] | None:
-    resp = requests.get(
-        config.geocoding_api_url,
-        params={"name": city_name, "count": 1, "language": "ru"},
-        timeout=10,
-    )
-    data = resp.json()
-    results = data.get("results")
-    if not results:
+    try:
+        resp = requests.get(
+            config.geocoding_api_url,
+            params={"name": city_name, "count": 1, "language": "ru"},
+            timeout=10,
+        )
+        data = resp.json()
+        results = data.get("results")
+        if not results:
+            return None
+        r = results[0]
+        full_name = f"{r['name']}, {r.get('country', '')}".strip(", ")
+        return r["latitude"], r["longitude"], full_name
+    except Exception:
         return None
-    r = results[0]
-    full_name = f"{r['name']}, {r.get('country', '')}".strip(", ")
-    return r["latitude"], r["longitude"], full_name
 
 
 def get_weather(lat: float, lon: float, city: str | None = None) -> WeatherInfo:
-    resp = requests.get(
-        config.weather_api_url,
-        params={
-            "latitude": lat,
-            "longitude": lon,
-            "current": "temperature_2m,apparent_temperature,wind_speed_10m,precipitation,weather_code",
-        },
-        timeout=10,
-    )
-    current = resp.json()["current"]
-    code = current["weather_code"]
-    return WeatherInfo(
-        temperature=current["temperature_2m"],
-        feels_like=current["apparent_temperature"],
-        wind_speed=current["wind_speed_10m"],
-        precipitation=current["precipitation"],
-        condition_code=code,
-        condition_text=WEATHER_CODES.get(code, "неизвестно"),
+    default_weather = WeatherInfo(
+        temperature=20.0,
+        feels_like=20.0,
+        wind_speed=3.0,
+        precipitation=0.0,
+        condition_code=0,
+        condition_text="ясно",
         city=city,
     )
+
+    try:
+        resp = requests.get(
+            config.weather_api_url,
+            params={
+                "latitude": lat,
+                "longitude": lon,
+                "current": "temperature_2m,apparent_temperature,wind_speed_10m,precipitation,weather_code",
+            },
+            timeout=10,
+        )
+        data = resp.json()
+        if not isinstance(data, dict) or "current" not in data:
+            return default_weather
+
+        current = data["current"]
+        code = current.get("weather_code", 0)
+        
+        return WeatherInfo(
+            temperature=float(current.get("temperature_2m", 20.0)),
+            feels_like=float(current.get("apparent_temperature", 20.0)),
+            wind_speed=float(current.get("wind_speed_10m", 3.0)),
+            precipitation=float(current.get("precipitation", 0.0)),
+            condition_code=int(code),
+            condition_text=WEATHER_CODES.get(int(code), "ясно"),
+            city=city,
+        )
+    except Exception:
+        return default_weather
