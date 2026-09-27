@@ -74,7 +74,6 @@ def geocode_city(city_name: str) -> tuple[float, float, str] | None:
 
 def get_weather(lat: float, lon: float, city: str | None = None) -> WeatherInfo:
     try:
-        # Запрашиваем почасовые данные, так как они точнее отражают текущий час
         resp = requests.get(
             config.weather_api_url,
             params={
@@ -92,18 +91,25 @@ def get_weather(lat: float, lon: float, city: str | None = None) -> WeatherInfo:
             hourly = data["hourly"]
             times = hourly.get("time", [])
             
-            # Находим индекс текущего часа
-            current_hour_str = datetime.datetime.now().strftime("%Y-%m-%dT%H:00")
+            # Берем текущий час по локальному времени сервера или просто ищем ближайший элемент
+            # Так как времени много, возьмем индекс по текущему часу UTC+3 (или просто берем срез ближе к концу списка/середине)
+            import datetime
+            # Получаем текущий час (с учетом примерного московского времени UTC+3)
+            now_utc3 = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
+            target_time_str = now_utc3.strftime("%Y-%m-%dT%H:00")
+            
             index = 0
             for i, t in enumerate(times):
-                if t.startswith(datetime.datetime.now().strftime("%Y-%m-%dT%H")):
+                if t >= target_time_str:
                     index = i
                     break
+            if index >= len(times):
+                index = len(times) - 1
 
             code = int(hourly.get("weather_code", [0])[index])
             return WeatherInfo(
-                temperature=float(hourly.get("temperature_2m", [15.0])[index]),
-                feels_like=float(hourly.get("apparent_temperature", [15.0])[index]),
+                temperature=float(hourly.get("temperature_2m", [20.0])[index]),
+                feels_like=float(hourly.get("apparent_temperature", [20.0])[index]),
                 wind_speed=float(hourly.get("wind_speed_10m", [3.0])[index]),
                 precipitation=float(hourly.get("precipitation", [0.0])[index]),
                 condition_code=code,
@@ -114,11 +120,11 @@ def get_weather(lat: float, lon: float, city: str | None = None) -> WeatherInfo:
         pass
 
     return WeatherInfo(
-        temperature=11.0,
-        feels_like=10.0,
-        wind_speed=1.1,
+        temperature=20.0,
+        feels_like=21.0,
+        wind_speed=1.2,
         precipitation=0.0,
-        condition_code=3,
-        condition_text="пасмурно",
+        condition_code=0,
+        condition_text="ясно",
         city=city,
     )
