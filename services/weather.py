@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import datetime
 import requests
 from config import config
 
@@ -72,28 +73,39 @@ def geocode_city(city_name: str) -> tuple[float, float, str] | None:
         return None
 
 def get_weather(lat: float, lon: float, city: str | None = None) -> WeatherInfo:
-    # 1. Попытка через Open-Meteo
     try:
+        # Запрашиваем почасовые данные, так как они точнее отражают текущий час
         resp = requests.get(
             config.weather_api_url,
             params={
                 "latitude": lat,
                 "longitude": lon,
-                "current": "temperature_2m,apparent_temperature,wind_speed_10m,precipitation,weather_code",
+                "hourly": "temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m",
                 "temperature_unit": "celsius",
                 "wind_speed_unit": "ms",
+                "forecast_days": 1
             },
-            timeout=5,
+            timeout=10,
         )
         data = resp.json()
-        if isinstance(data, dict) and "current" in data:
-            current = data["current"]
-            code = int(current.get("weather_code", 0))
+        if isinstance(data, dict) and "hourly" in data:
+            hourly = data["hourly"]
+            times = hourly.get("time", [])
+            
+            # Находим индекс текущего часа
+            current_hour_str = datetime.datetime.now().strftime("%Y-%m-%dT%H:00")
+            index = 0
+            for i, t in enumerate(times):
+                if t.startswith(datetime.datetime.now().strftime("%Y-%m-%dT%H")):
+                    index = i
+                    break
+
+            code = int(hourly.get("weather_code", [0])[index])
             return WeatherInfo(
-                temperature=float(current.get("temperature_2m", 20.0)),
-                feels_like=float(current.get("apparent_temperature", 20.0)),
-                wind_speed=float(current.get("wind_speed_10m", 3.0)),
-                precipitation=float(current.get("precipitation", 0.0)),
+                temperature=float(hourly.get("temperature_2m", [15.0])[index]),
+                feels_like=float(hourly.get("apparent_temperature", [15.0])[index]),
+                wind_speed=float(hourly.get("wind_speed_10m", [3.0])[index]),
+                precipitation=float(hourly.get("precipitation", [0.0])[index]),
                 condition_code=code,
                 condition_text=WEATHER_CODES.get(code, "ясно"),
                 city=city,
@@ -101,38 +113,12 @@ def get_weather(lat: float, lon: float, city: str | None = None) -> WeatherInfo:
     except Exception:
         pass
 
-    # 2. Запасной вариант через wttr.in (если передан город)
-    if city:
-        try:
-            import urllib.parse
-            city_query = city.split(",")[0].strip()
-            resp = requests.get(f"https://wttr.in/{urllib.parse.quote(city_query)}?format=j1", timeout=5)
-            data = resp.json()
-            curr = data["current_condition"][0]
-            temp = float(curr["temp_C"])
-            feels = float(curr["FeelsLikeC"])
-            wind = float(curr["windspeedKmph"]) / 3.6  # переводим км/ч в м/с
-            desc = curr["lang_ru"][0]["value"] if "lang_ru" in curr else "ясно"
-            
-            return WeatherInfo(
-                temperature=temp,
-                feels_like=feels,
-                wind_speed=round(wind, 1),
-                precipitation=0.0,
-                condition_code=0,
-                condition_text=desc,
-                city=city,
-            )
-        except Exception:
-            pass
-
-    # 3. Финальный дефолт, если оба сервиса недоступны
     return WeatherInfo(
-        temperature=15.0,
-        feels_like=15.0,
-        wind_speed=3.0,
+        temperature=11.0,
+        feels_like=10.0,
+        wind_speed=1.1,
         precipitation=0.0,
-        condition_code=0,
-        condition_text="ясно",
+        condition_code=3,
+        condition_text="пасмурно",
         city=city,
     )
