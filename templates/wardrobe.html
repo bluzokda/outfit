@@ -1,36 +1,37 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-4">
     <div>
-        <h1 class="text-3xl font-bold tracking-tight text-white">Мой гардероб</h1>
-        <p class="text-purple-300/70 text-sm mt-1">Все твои вещи в одном месте</p>
+        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white bg-gradient-to-r from-white to-purple-300 bg-clip-text text-transparent">Мой гардероб</h1>
+        <p class="text-purple-300/70 text-sm mt-1">Все твои вещи в цифровом пространстве</p>
     </div>
-    <a href="/wardrobe/add" class="px-5 py-2.5 rounded-xl font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 neon-glow transition transform hover:-translate-y-0.5 text-sm">
-        + Добавить вещь
+    <a href="/wardrobe/add" class="px-6 py-3 rounded-2xl font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 neon-glow transition transform hover:-translate-y-1 text-sm shadow-lg flex items-center gap-2">
+        <span>+</span> Добавить вещь
     </a>
 </div>
 
 {% if items %}
-    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
         {% for item in items %}
-            <div class="glass-panel rounded-2xl overflow-hidden border border-purple-500/20 group hover:border-purple-500/50 transition duration-300 flex flex-col justify-between">
+            <div class="glass-panel rounded-3xl overflow-hidden border border-purple-500/20 group hover:border-purple-500/60 transition-all duration-500 flex flex-col justify-between transform hover:-translate-y-1.5 shadow-xl">
                 <div>
-                    <div class="aspect-square bg-purple-950/40 relative overflow-hidden">
-                        <img src="/{{ item.photo_path }}" alt="Вещь" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
-                        <span class="absolute top-2 left-2 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-purple-950/80 backdrop-blur-md text-purple-200 border border-purple-500/30">
+                    <div class="aspect-square bg-purple-950/60 relative overflow-hidden">
+                        <img src="/{{ item.photo_path }}" alt="Вещь" class="w-full h-full object-cover group-hover:scale-110 transition duration-700">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition duration-300"></div>
+                        <span class="absolute top-3 left-3 px-3 py-1 rounded-xl text-[10px] font-bold uppercase tracking-wider bg-purple-950/80 backdrop-blur-md text-purple-200 border border-purple-500/40 shadow-md">
                             {{ category_labels.get(item.category, item.category) }}
                         </span>
                     </div>
                     {% if item.description %}
-                        <div class="p-3">
-                            <p class="text-xs text-purple-200/90 truncate">{{ item.description }}</p>
+                        <div class="p-3.5">
+                            <p class="text-xs text-purple-200/90 truncate font-medium">{{ item.description }}</p>
                         </div>
                     {% endif %}
                 </div>
-                <div class="p-3 pt-0">
+                <div class="p-3.5 pt-0">
                     <form action="/wardrobe/delete/{{ item.id }}" method="POST" onsubmit="return confirm('Удалить эту вещь из гардероба?');">
-                        <button type="submit" class="w-full py-1.5 rounded-xl text-xs font-medium bg-red-950/50 text-red-300 border border-red-500/30 hover:bg-red-900/60 transition">
-                            Удалить вещь
+                        <button type="submit" class="w-full py-2 rounded-xl text-xs font-semibold bg-red-950/40 text-red-300 border border-red-500/30 hover:bg-red-900/60 transition shadow-inner">
+                            Удалить
                         </button>
                     </form>
                 </div>
@@ -38,11 +39,11 @@
         {% endfor %}
     </div>
 {% else %}
-    <div class="glass-panel rounded-3xl p-12 text-center max-w-md mx-auto mt-12 border border-purple-500/20">
-        <div class="text-4xl mb-3">🧥</div>
-        <h3 class="text-lg font-semibold text-white mb-1">Гардероб пока пуст</h3>
-        <p class="text-sm text-purple-300/70 mb-6">Добавь свою первую вещь, чтобы начать создавать образы.</p>
-        <a href="/wardrobe/add" class="px-6 py-3 rounded-xl font-semibold text-white bg-purple-600 hover:bg-purple-500 transition shadow-lg">Добавить вещь</a>
+    <div class="glass-panel rounded-3xl p-16 text-center max-w-lg mx-auto mt-16 border border-purple-500/20 shadow-2xl">
+        <div class="text-5xl mb-4 animate-bounce" style="animation-duration: 2.5s;">🧥</div>
+        <h3 class="text-xl font-bold text-white mb-2">Гардероб пока пуст</h3>
+        <p class="text-sm text-purple-300/70 mb-8">Добавь свою первую вещь, чтобы ИИ мог начать создавать для тебя образы.</p>
+        <a href="/wardrobe/add" class="px-8 py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 neon-glow transition shadow-lg inline-block">Добавить вещь</a>
     </div>
 {% endif %}
 {% endblock %}
