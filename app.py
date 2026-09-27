@@ -14,6 +14,9 @@ from services.weather import geocode_city, get_weather
 app = Flask(__name__)
 app.secret_key = config.secret_key
 
+# Вызываем инициализацию базы данных сразу при запуске (нужно для Gunicorn на Render)
+init_db()
+
 CATEGORY_LABELS = {
     "outerwear": "Верхняя одежда",
     "top": "Верх (футболка/рубашка/свитер)",
@@ -92,6 +95,7 @@ def outfit_form():
         result = build_outfit(occasion, weather, wardrobe_items)
 
         collage_url = None
+        collage_path = None
         if result.item_ids:
             selected = [i for i in wardrobe_items if i["id"] in result.item_ids]
             photo_paths = [i["photo_path"] for i in selected]
@@ -123,5 +127,4 @@ def outfit_form():
 
 
 if __name__ == "__main__":
-    init_db()
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=False)
