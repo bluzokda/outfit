@@ -68,11 +68,11 @@ def geocode_city(city_name: str) -> tuple[float, float, str] | None:
 
         full_name = f"{best_r['name']}, {best_r.get('country', '')}".strip(", ")
         return best_r["latitude"], best_r["longitude"], full_name
-    except Exception as e:
-        print(f"Geocoding error: {e}")
+    except Exception:
         return None
 
 def get_weather(lat: float, lon: float, city: str | None = None) -> WeatherInfo:
+    # 1. Попытка через Open-Meteo
     try:
         resp = requests.get(
             config.weather_api_url,
@@ -83,37 +83,56 @@ def get_weather(lat: float, lon: float, city: str | None = None) -> WeatherInfo:
                 "temperature_unit": "celsius",
                 "wind_speed_unit": "ms",
             },
-            timeout=10,
+            timeout=5,
         )
-        
-        # Печатаем статус и ответ в консоль, чтобы увидеть причину
-        print(f"Weather API status code: {resp.status_code}")
         data = resp.json()
-        print(f"Weather API response: {data}")
+        if isinstance(data, dict) and "current" in data:
+            current = data["current"]
+            code = int(current.get("weather_code", 0))
+            return WeatherInfo(
+                temperature=float(current.get("temperature_2m", 20.0)),
+                feels_like=float(current.get("apparent_temperature", 20.0)),
+                wind_speed=float(current.get("wind_speed_10m", 3.0)),
+                precipitation=float(current.get("precipitation", 0.0)),
+                condition_code=code,
+                condition_text=WEATHER_CODES.get(code, "ясно"),
+                city=city,
+            )
+    except Exception:
+        pass
 
-        if not isinstance(data, dict) or "current" not in data:
-            raise ValueError("Invalid response structure from weather API")
+    # 2. Запасной вариант через wttr.in (если передан город)
+    if city:
+        try:
+            city_query = city.split(",")[0].strip()
+            resp = requests.get(f"https://wttr.in/{urllib.parse.quote(city_query)}?format=j1", timeout=5)
+            data = resp.json()
+            curr = data["current_condition"][0]
+            temp = float(curr["temp_C"])
+            feels = float(curr["FeelsLikeC"])
+            wind = float(curr["windspeedKmph"]) / 3.6  км/ч в м/с
+            desc = curr["lang_ru"][0]["value"] if "lang_ru" in curr else "ясно"
+            
+            return WeatherInfo(
+                temperature=temp,
+                feels_like=feels,
+                wind_speed=round(wind, 1),
+                precipitation=0.0,
+                condition_code=0,
+                condition_text=desc,
+                city=city,
+            )
+        except Exception:
+            import urllib.parse
+            pass
 
-        current = data["current"]
-        code = current.get("weather_code", 0)
-        
-        return WeatherInfo(
-            temperature=float(current.get("temperature_2m", 20.0)),
-            feels_like=float(current.get("apparent_temperature", 20.0)),
-            wind_speed=float(current.get("wind_speed_10m", 3.0)),
-            precipitation=float(current.get("precipitation", 0.0)),
-            condition_code=int(code),
-            condition_text=WEATHER_CODES.get(int(code), "ясно"),
-            city=city,
-        )
-    except Exception as e:
-        print(f"Weather API failed, fallback used. Error: {e}")
-        return WeatherInfo(
-            temperature=20.0,
-            feels_like=20.0,
-            wind_speed=3.0,
-            precipitation=0.0,
-            condition_code=0,
-            condition_text="ясно",
-            city=city,
-        )
+    # 3. Финальный дефолт, если оба сервиса недоступны
+    return WeatherInfo(
+        temperature=15.0,
+        feels_like=15.0,
+        wind_speed=3.0,
+        precipitation=0.0,
+        condition_code=0,
+        condition_text="ясно",
+        city=city,
+    )
