@@ -1,4 +1,5 @@
 import requests
+import json
 
 from config import config
 from services.weather import WeatherInfo
@@ -31,36 +32,35 @@ def _items_to_prompt_list(items):
 
 
 def _call_gemini(prompt: str, schema: dict) -> dict:
-    """Запрос к Gemini через Interactions API, с структурированным JSON-ответом."""
+    """Запрос к Gemini через официальный API генерации контента с JSON-ответом."""
+    # Используем стабильный стандартный эндпоинт актуальной модели gemini-2.5-flash
+    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={config.gemini_api_key}"
+    
     response = requests.post(
-        config.gemini_api_url,
+        api_url,
         headers={
-            "x-goog-api-key": config.gemini_api_key,
             "Content-Type": "application/json",
         },
         json={
-            "model": "gemini-3.8-flash",
-            "input": prompt,
-            "response_format": {
-                "type": "text",
-                "mime_type": "application/json",
-                "schema": schema,
-            },
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }],
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "responseSchema": schema
+            }
         },
         timeout=30,
     )
     response.raise_for_status()
     data = response.json()
 
-    # Находим текстовый блок в model_output среди шагов ответа
-    for step in data.get("steps", []):
-        if step.get("type") == "model_output":
-            for block in step.get("content", []):
-                if block.get("type") == "text":
-                    import json
-                    return json.loads(block["text"])
-
-    raise ValueError(f"Не удалось извлечь ответ от Gemini: {data}")
+    try:
+        # Достаем текст из стандартного ответа Gemini API
+        text_content = data["candidates"][0]["content"]["parts"][0]["text"]
+        return json.loads(text_content)
+    except (KeyError, IndexError, json.JSONDecodeError) as e:
+        raise ValueError(f"Не удалось извлечь JSON-ответ от Gemini: {data}") from e
 
 
 def build_outfit(occasion: str, weather: WeatherInfo, wardrobe_items) -> OutfitResult:
@@ -70,7 +70,7 @@ def build_outfit(occasion: str, weather: WeatherInfo, wardrobe_items) -> OutfitR
     base_context = (
         f"Ты — персональный стилист. Погода: {weather.temperature}°C "
         f"(ощущается как {weather.feels_like}°C), {weather.condition_text}, "
-        f"ветер {weather.wind_speed} км/ч. Повод: {occasion}.\n\n"
+        f"ветер {weather.wind_speed} м/с. Повод: {occasion}.\n\n"
     )
 
     if has_wardrobe:
