@@ -1,21 +1,66 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Лук{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Стилист Гардероба</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes floatBg {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        body {
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            background-size: 200% 200%;
+            animation: floatBg 15s ease infinite;
+            color: #f3f4f6;
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        .glass-panel {
+            background: rgba(30, 27, 75, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .neon-glow {
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.4);
+        }
+        .neon-glow:hover {
+            box-shadow: 0 0 30px rgba(168, 85, 247, 0.7);
+        }
+    </style>
 </head>
-<body>
-  <div class="shell">
-    <nav class="top">
-      <a href="{{ url_for('index') }}" class="brand">Лук</a>
-      <div class="links">
-        <a href="{{ url_for('wardrobe') }}">Гардероб</a>
-        <a href="{{ url_for('outfit_form') }}">Собрать образ</a>
-      </div>
-    </nav>
-    {% block content %}{% endblock %}
-  </div>
+<body class="flex flex-col min-h-screen selection:bg-purple-500 selection:text-white">
+    <header class="glass-panel sticky top-0 z-50 border-b border-purple-900/40">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+            <a href="/" class="text-xl font-extrabold bg-gradient-to-r from-purple-400 via-indigo-300 to-blue-400 bg-clip-text text-transparent hover:opacity-80 transition">
+                ✨ AI Stylist
+            </a>
+            <nav class="flex gap-2 sm:gap-4">
+                <a href="/" class="px-3 py-2 rounded-xl text-sm font-medium hover:bg-purple-900/40 transition text-purple-200">Главная</a>
+                <a href="/wardrobe" class="px-3 py-2 rounded-xl text-sm font-medium hover:bg-purple-900/40 transition text-purple-200">Гардероб</a>
+                <a href="/outfit" class="px-4 py-2 rounded-xl text-sm font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 text-white neon-glow transition transform hover:-translate-y-0.5">Собрать образ</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-5xl w-full mx-auto px-4 py-8 animate-fade-in">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="text-center py-6 text-xs text-purple-400/60 border-t border-purple-900/20">
+        AI Wardrobe & Outfit Assistant • Сияй в любом образе
+    </footer>
 </body>
 </html>
