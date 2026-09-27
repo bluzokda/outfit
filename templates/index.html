@@ -1,22 +1,46 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="text-center py-12 sm:py-20 flex flex-col items-center">
-    <div class="inline-block mb-4 px-4 py-1.5 rounded-full glass-panel text-purple-300 text-xs font-semibold tracking-wider uppercase border border-purple-500/30">
+<div class="text-center py-16 sm:py-24 flex flex-col items-center relative">
+    <!-- Анимированный бейдж -->
+    <div class="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-full glass-panel text-purple-300 text-xs font-semibold tracking-wider uppercase border border-purple-500/40 shadow-lg animate-bounce" style="animation-duration: 3s;">
+        <span class="w-2 h-2 rounded-full bg-purple-400 animate-ping"></span>
         Твой персональный стилист с ИИ
     </div>
-    <h1 class="text-4xl sm:text-6xl font-black tracking-tight mb-6 bg-gradient-to-r from-white via-purple-200 to-indigo-300 bg-clip-text text-transparent">
+
+    <h1 class="text-4xl sm:text-7xl font-black tracking-tight mb-6 bg-gradient-to-r from-white via-purple-200 to-indigo-400 bg-clip-text text-transparent max-w-3xl leading-tight">
         Создавай идеальные луки каждый день
     </h1>
-    <p class="max-w-xl text-purple-200/80 text-base sm:text-lg mb-10">
-        Загружай вещи в цифровой гардероб, указывай повод, а искусственный интеллект подберет стильный комплект с учетом погоды.
+
+    <p class="max-w-xl text-purple-200/80 text-base sm:text-lg mb-12 leading-relaxed">
+        Загружай вещи в цифровой гардероб, указывай повод, а искусственный интеллект подберет стильный комплект с учетом погоды и трендов.
     </p>
-    <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-        <a href="/outfit" class="px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 neon-glow transition transform hover:-translate-y-1 text-center">
-            Подобрать образ
+
+    <div class="flex flex-col sm:flex-row gap-5 w-full sm:w-auto justify-center">
+        <a href="/outfit" class="px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 neon-glow transition transform hover:-translate-y-1 text-center shadow-xl">
+            Подобрать образ ✨
         </a>
-        <a href="/wardrobe" class="px-8 py-4 rounded-2xl font-semibold text-purple-200 glass-panel hover:bg-purple-900/50 transition transform hover:-translate-y-1 text-center border border-purple-500/30">
-            Мой гардероб
+        <a href="/wardrobe" class="px-8 py-4 rounded-2xl font-semibold text-purple-200 glass-panel hover:bg-purple-900/40 transition transform hover:-translate-y-1 text-center border border-purple-500/30">
+            Мой гардероб 🧥
         </a>
+    </div>
+
+    <!-- Дополнительные плашки-преимущества -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-20 w-full max-w-4xl text-left">
+        <div class="glass-panel p-6 rounded-3xl border border-purple-500/20 group hover:border-purple-500/50 transition">
+            <div class="text-2xl mb-3">🌤️</div>
+            <h3 class="text-white font-semibold mb-1">Учет погоды</h3>
+            <p class="text-xs text-purple-300/70">Автоматическая сверка с метеоданными для комфортного лука.</p>
+        </div>
+        <div class="glass-panel p-6 rounded-3xl border border-purple-500/20 group hover:border-purple-500/50 transition">
+            <div class="text-2xl mb-3">🤖</div>
+            <h3 class="text-white font-semibold mb-1">ИИ-Стилист</h3>
+            <p class="text-xs text-purple-300/70">Глубокий анализ гардероба и генерация гармоничных сочетаний.</p>
+        </div>
+        <div class="glass-panel p-6 rounded-3xl border border-purple-500/20 group hover:border-purple-500/50 transition">
+            <div class="text-2xl mb-3">📸</div>
+            <h3 class="text-white font-semibold mb-1">Коллажи образов</h3>
+            <p class="text-xs text-purple-300/70">Наглядная визуализация готового комплекта в один клик.</p>
+        </div>
     </div>
 </div>
 {% endblock %}
