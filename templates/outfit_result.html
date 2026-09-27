@@ -1,47 +1,56 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-2xl mx-auto glass-panel rounded-3xl p-6 sm:p-8 border border-purple-500/30 shadow-2xl space-y-6">
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-purple-900/40 gap-2">
+<div class="max-w-2xl mx-auto glass-panel rounded-3xl p-6 sm:p-10 border border-purple-500/30 shadow-2xl space-y-8 animate-fade-in">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-6 border-b border-purple-900/40 gap-4">
         <div>
-            <h1 class="text-2xl font-bold text-white">Твой образ готов</h1>
-            <p class="text-sm text-purple-300/70">Повод: <span class="text-purple-200 font-medium">{{ occasion }}</span></p>
+            <h1 class="text-3xl font-black text-white mb-1">Твой образ готов</h1>
+            <p class="text-sm text-purple-300/70">Повод: <span class="text-purple-200 font-semibold">{{ occasion }}</span></p>
         </div>
         {% if weather %}
-            <div class="px-3 py-1.5 rounded-xl bg-purple-950/60 border border-purple-500/30 text-xs text-purple-200">
-                📍 {{ weather.city }} • <strong>{{ weather.temperature }}°C</strong>, {{ weather.condition_text }}
+            <div class="px-4 py-2 rounded-2xl bg-purple-950/80 border border-purple-500/40 text-xs text-purple-200 shadow-inner flex items-center gap-2">
+                <span>📍 {{ weather.city }}</span>
+                <span class="w-1 h-1 rounded-full bg-purple-400"></span>
+                <strong>{{ weather.temperature }}°C</strong>, {{ weather.condition_text }}
             </div>
         {% endif %}
     </div>
 
     {% if collage_url %}
-        <div class="rounded-2xl overflow-hidden border border-purple-500/30 bg-purple-950/40 p-2 flex justify-center">
-            <img src="{{ collage_url }}" alt="Коллаж одежды" class="max-h-96 rounded-xl object-contain">
+        <div class="rounded-2xl overflow-hidden border border-purple-500/40 bg-purple-950/60 p-3 flex justify-center shadow-xl group">
+            <img src="{{ collage_url }}" alt="Коллаж одежды" class="max-h-[420px] rounded-xl object-contain group-hover:scale-[1.02] transition duration-500">
         </div>
     {% endif %}
 
     <div>
-        <h3 class="text-sm font-semibold text-purple-300 uppercase tracking-wider mb-2">Совет стилиста</h3>
-        <div class="p-4 rounded-2xl bg-purple-950/40 border border-purple-500/20 text-purple-100 text-sm leading-relaxed whitespace-pre-line">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-purple-400 mb-3 flex items-center gap-2">
+            <span>✨</span> Совет стилиста
+        </h3>
+        <div class="p-5 rounded-2xl bg-purple-950/50 border border-purple-500/20 text-purple-100 text-sm leading-relaxed whitespace-pre-line shadow-inner">
             {{ explanation }}
         </div>
     </div>
 
     {% if recommendations %}
         <div>
-            <h3 class="text-sm font-semibold text-purple-300 uppercase tracking-wider mb-2">Дополнительные рекомендации</h3>
-            <ul class="list-disc list-inside space-y-1 text-sm text-purple-200/90 pl-1">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-purple-400 mb-3 flex items-center gap-2">
+                <span>💡</span> Дополнительные рекомендации
+            </h3>
+            <ul class="space-y-2 text-sm text-purple-200/90">
                 {% for rec in recommendations %}
-                    <li>{{ rec }}</li>
+                    <li class="flex items-start gap-2.5 bg-purple-950/30 p-3 rounded-xl border border-purple-500/10">
+                        <span class="text-purple-400 mt-0.5">•</span>
+                        <span>{{ rec }}</span>
+                    </li>
                 {% endfor %}
             </ul>
         </div>
     {% endif %}
 
-    <div class="pt-4 flex gap-4">
-        <a href="/outfit" class="flex-1 py-3 text-center rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 neon-glow transition">
+    <div class="pt-4 flex flex-col sm:flex-row gap-4">
+        <a href="/outfit" class="flex-1 py-4 text-center rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 neon-glow transition shadow-lg">
             Собрать еще лук
         </a>
-        <a href="/wardrobe" class="px-6 py-3 text-center rounded-xl font-semibold text-purple-200 glass-panel hover:bg-purple-900/50 transition border border-purple-500/30">
+        <a href="/wardrobe" class="px-8 py-4 text-center rounded-2xl font-semibold text-purple-200 glass-panel hover:bg-purple-900/40 transition border border-purple-500/30 shadow-lg">
             Гардероб
         </a>
     </div>
