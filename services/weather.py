@@ -104,13 +104,14 @@ def get_weather(lat: float, lon: float, city: str | None = None) -> WeatherInfo:
     # 2. Запасной вариант через wttr.in (если передан город)
     if city:
         try:
+            import urllib.parse
             city_query = city.split(",")[0].strip()
             resp = requests.get(f"https://wttr.in/{urllib.parse.quote(city_query)}?format=j1", timeout=5)
             data = resp.json()
             curr = data["current_condition"][0]
             temp = float(curr["temp_C"])
             feels = float(curr["FeelsLikeC"])
-            wind = float(curr["windspeedKmph"]) / 3.6  км/ч в м/с
+            wind = float(curr["windspeedKmph"]) / 3.6  # переводим км/ч в м/с
             desc = curr["lang_ru"][0]["value"] if "lang_ru" in curr else "ясно"
             
             return WeatherInfo(
@@ -123,7 +124,6 @@ def get_weather(lat: float, lon: float, city: str | None = None) -> WeatherInfo:
                 city=city,
             )
         except Exception:
-            import urllib.parse
             pass
 
     # 3. Финальный дефолт, если оба сервиса недоступны
