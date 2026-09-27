@@ -1,30 +1,49 @@
 {% extends "base.html" %}
-{% block title %}Твой образ{% endblock %}
 {% block content %}
-  <h1>Образ для «{{ occasion }}»</h1>
-  <p class="weather-line">
-    {{ weather.temperature }}°C, ощущается как {{ weather.feels_like }}°C, {{ weather.condition_text }}
-    {% if weather.city %} — {{ weather.city }}{% endif %}
-  </p>
-
-  {% if collage_url %}
-    <div class="collage-frame">
-      <img src="{{ collage_url }}" alt="Собранный образ">
+<div class="max-w-2xl mx-auto glass-panel rounded-3xl p-6 sm:p-8 border border-purple-500/30 shadow-2xl space-y-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-purple-900/40 gap-2">
+        <div>
+            <h1 class="text-2xl font-bold text-white">Твой образ готов</h1>
+            <p class="text-sm text-purple-300/70">Повод: <span class="text-purple-200 font-medium">{{ occasion }}</span></p>
+        </div>
+        {% if weather %}
+            <div class="px-3 py-1.5 rounded-xl bg-purple-950/60 border border-purple-500/30 text-xs text-purple-200">
+                📍 {{ weather.city }} • <strong>{{ weather.temperature }}°C</strong>, {{ weather.condition_text }}
+            </div>
+        {% endif %}
     </div>
-  {% endif %}
 
-  <p class="explanation">{{ explanation }}</p>
+    {% if collage_url %}
+        <div class="rounded-2xl overflow-hidden border border-purple-500/30 bg-purple-950/40 p-2 flex justify-center">
+            <img src="{{ collage_url }}" alt="Коллаж одежды" class="max-h-96 rounded-xl object-contain">
+        </div>
+    {% endif %}
 
-  {% if recommendations %}
-    <ul class="recs">
-      {% for rec in recommendations %}
-        <li>{{ rec }}</li>
-      {% endfor %}
-    </ul>
-  {% endif %}
+    <div>
+        <h3 class="text-sm font-semibold text-purple-300 uppercase tracking-wider mb-2">Совет стилиста</h3>
+        <div class="p-4 rounded-2xl bg-purple-950/40 border border-purple-500/20 text-purple-100 text-sm leading-relaxed whitespace-pre-line">
+            {{ explanation }}
+        </div>
+    </div>
 
-  <div class="actions">
-    <a href="{{ url_for('outfit_form') }}" class="btn">Собрать ещё раз</a>
-    <a href="{{ url_for('wardrobe') }}" class="btn">Гардероб</a>
-  </div>
+    {% if recommendations %}
+        <div>
+            <h3 class="text-sm font-semibold text-purple-300 uppercase tracking-wider mb-2">Дополнительные рекомендации</h3>
+            <ul class="list-disc list-inside space-y-1 text-sm text-purple-200/90 pl-1">
+                {% for rec in recommendations %}
+                    <li>{{ rec }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <div class="pt-4 flex gap-4">
+        <a href="/outfit" class="flex-1 py-3 text-center rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 neon-glow transition">
+            Собрать еще лук
+        </a>
+        <a href="/wardrobe" class="px-6 py-3 text-center rounded-xl font-semibold text-purple-200 glass-panel hover:bg-purple-900/50 transition border border-purple-500/30">
+            Гардероб
+        </a>
+    </div>
+</div>
 {% endblock %}
