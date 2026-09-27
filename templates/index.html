@@ -1,13 +1,22 @@
 {% extends "base.html" %}
-{% block title %}Лук — подбор образа{% endblock %}
 {% block content %}
-  <h1>Что надеть сегодня</h1>
-  <p class="lede">
-    Укажи повод и место — учтём погоду и соберём образ. Добавь свои вещи в
-    гардероб заранее, и советы будут собираться из того, что у тебя реально есть.
-  </p>
-  <div class="actions">
-    <a href="{{ url_for('outfit_form') }}" class="btn primary">Собрать образ</a>
-    <a href="{{ url_for('wardrobe') }}" class="btn">Мой гардероб</a>
-  </div>
+<div class="text-center py-12 sm:py-20 flex flex-col items-center">
+    <div class="inline-block mb-4 px-4 py-1.5 rounded-full glass-panel text-purple-300 text-xs font-semibold tracking-wider uppercase border border-purple-500/30">
+        Твой персональный стилист с ИИ
+    </div>
+    <h1 class="text-4xl sm:text-6xl font-black tracking-tight mb-6 bg-gradient-to-r from-white via-purple-200 to-indigo-300 bg-clip-text text-transparent">
+        Создавай идеальные луки каждый день
+    </h1>
+    <p class="max-w-xl text-purple-200/80 text-base sm:text-lg mb-10">
+        Загружай вещи в цифровой гардероб, указывай повод, а искусственный интеллект подберет стильный комплект с учетом погоды.
+    </p>
+    <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+        <a href="/outfit" class="px-8 py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 neon-glow transition transform hover:-translate-y-1 text-center">
+            Подобрать образ
+        </a>
+        <a href="/wardrobe" class="px-8 py-4 rounded-2xl font-semibold text-purple-200 glass-panel hover:bg-purple-900/50 transition transform hover:-translate-y-1 text-center border border-purple-500/30">
+            Мой гардероб
+        </a>
+    </div>
+</div>
 {% endblock %}
