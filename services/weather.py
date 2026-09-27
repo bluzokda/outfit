@@ -1,7 +1,5 @@
 from dataclasses import dataclass
-
 import requests
-
 from config import config
 
 WEATHER_CODES = {
@@ -31,7 +29,6 @@ WEATHER_CODES = {
     99: "сильная гроза с градом",
 }
 
-
 @dataclass
 class WeatherInfo:
     temperature: float
@@ -50,7 +47,6 @@ class WeatherInfo:
     def is_snowy(self) -> bool:
         return self.condition_code in range(71, 78) or self.condition_code in (85, 86)
 
-
 def geocode_city(city_name: str) -> tuple[float, float, str] | None:
     try:
         resp = requests.get(
@@ -63,7 +59,6 @@ def geocode_city(city_name: str) -> tuple[float, float, str] | None:
         if not results:
             return None
         
-        # Ищем в приоритете город из России или СНГ, либо берем первый попавшийся
         best_r = results[0]
         for r in results:
             country = r.get("country", "")
@@ -73,21 +68,11 @@ def geocode_city(city_name: str) -> tuple[float, float, str] | None:
 
         full_name = f"{best_r['name']}, {best_r.get('country', '')}".strip(", ")
         return best_r["latitude"], best_r["longitude"], full_name
-    except Exception:
+    except Exception as e:
+        print(f"Geocoding error: {e}")
         return None
 
-
 def get_weather(lat: float, lon: float, city: str | None = None) -> WeatherInfo:
-    default_weather = WeatherInfo(
-        temperature=20.0,
-        feels_like=20.0,
-        wind_speed=3.0,
-        precipitation=0.0,
-        condition_code=0,
-        condition_text="ясно",
-        city=city,
-    )
-
     try:
         resp = requests.get(
             config.weather_api_url,
@@ -95,14 +80,19 @@ def get_weather(lat: float, lon: float, city: str | None = None) -> WeatherInfo:
                 "latitude": lat,
                 "longitude": lon,
                 "current": "temperature_2m,apparent_temperature,wind_speed_10m,precipitation,weather_code",
-                "temperature_unit": "celsius",          # Явно указываем градусы Цельсия
-                "wind_speed_unit": "ms",               # Метры в секунду
+                "temperature_unit": "celsius",
+                "wind_speed_unit": "ms",
             },
             timeout=10,
         )
+        
+        # Печатаем статус и ответ в консоль, чтобы увидеть причину
+        print(f"Weather API status code: {resp.status_code}")
         data = resp.json()
+        print(f"Weather API response: {data}")
+
         if not isinstance(data, dict) or "current" not in data:
-            return default_weather
+            raise ValueError("Invalid response structure from weather API")
 
         current = data["current"]
         code = current.get("weather_code", 0)
@@ -116,5 +106,14 @@ def get_weather(lat: float, lon: float, city: str | None = None) -> WeatherInfo:
             condition_text=WEATHER_CODES.get(int(code), "ясно"),
             city=city,
         )
-    except Exception:
-        return default_weather
+    except Exception as e:
+        print(f"Weather API failed, fallback used. Error: {e}")
+        return WeatherInfo(
+            temperature=20.0,
+            feels_like=20.0,
+            wind_speed=3.0,
+            precipitation=0.0,
+            condition_code=0,
+            condition_text="ясно",
+            city=city,
+        )
