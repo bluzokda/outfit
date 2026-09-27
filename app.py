@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 
 from config import config
 from database import init_db
-from repository import add_wardrobe_item, get_wardrobe, save_outfit_history
+from repository import add_wardrobe_item, delete_wardrobe_item, get_wardrobe, save_outfit_history
 from services.collage import build_collage
 from services.outfit_logic import build_outfit
 from services.weather import geocode_city, get_weather
@@ -14,7 +14,7 @@ from services.weather import geocode_city, get_weather
 app = Flask(__name__)
 app.secret_key = config.secret_key
 
-# Вызываем инициализацию базы данных сразу при запуске (нужно для Gunicorn на Render)
+# Инициализируем базу данных сразу при старте приложения (нужно для Render/Gunicorn)
 init_db()
 
 CATEGORY_LABELS = {
@@ -26,24 +26,19 @@ CATEGORY_LABELS = {
     "accessory": "Аксессуар",
 }
 
-
 def get_session_id() -> str:
-    """Каждому браузеру — свой session_id в cookie, чтобы разделять гардеробы."""
     if "session_id" not in session:
         session["session_id"] = uuid.uuid4().hex
     return session["session_id"]
-
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
-
 @app.route("/wardrobe")
 def wardrobe():
     items = get_wardrobe(get_session_id())
     return render_template("wardrobe.html", items=items, category_labels=CATEGORY_LABELS)
-
 
 @app.route("/wardrobe/add", methods=["GET", "POST"])
 def add_item():
@@ -67,6 +62,16 @@ def add_item():
 
     return render_template("add_item.html", category_labels=CATEGORY_LABELS)
 
+@app.route("/wardrobe/delete/<int:item_id>", methods=["POST"])
+def delete_item(item_id):
+    session_id = get_session_id()
+    photo_path = delete_wardrobe_item(item_id, session_id)
+    if photo_path and os.path.exists(photo_path):
+        try:
+            os.remove(photo_path)
+        except Exception:
+            pass
+    return redirect(url_for("wardrobe"))
 
 @app.route("/outfit", methods=["GET", "POST"])
 def outfit_form():
@@ -124,7 +129,6 @@ def outfit_form():
         )
 
     return render_template("outfit_form.html")
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=False)
