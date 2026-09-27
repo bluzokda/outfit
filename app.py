@@ -14,7 +14,6 @@ from services.weather import geocode_city, get_weather
 app = Flask(__name__)
 app.secret_key = config.secret_key
 
-# Инициализируем базу данных сразу при старте приложения (нужно для Render/Gunicorn)
 init_db()
 
 CATEGORY_LABELS = {
@@ -97,7 +96,14 @@ def outfit_form():
 
         session_id = get_session_id()
         wardrobe_items = get_wardrobe(session_id)
-        result = build_outfit(occasion, weather, wardrobe_items)
+        
+        try:
+            result = build_outfit(occasion, weather, wardrobe_items)
+        except Exception as e:
+            return render_template(
+                "outfit_form.html", 
+                error="Сервер генерации образов временно перегружен (ошибка 503 от Google API). Попробуй нажать кнопку ещё раз через пару секунд."
+            )
 
         collage_url = None
         collage_path = None
@@ -131,5 +137,4 @@ def outfit_form():
     return render_template("outfit_form.html")
 
 if __name__ == "__main__":
-    init_db()
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=False)
