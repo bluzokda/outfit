@@ -33,8 +33,8 @@ def _items_to_prompt_list(items):
 
 def _call_gemini(prompt: str, schema: dict) -> dict:
     """Запрос к Gemini через официальный API генерации контента с JSON-ответом."""
-    # Используем стабильный стандартный эндпоинт актуальной модели gemini-2.5-flash
-    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={config.gemini_api_key}"
+    # Используем проверенную стабильную модель gemini-1.5-flash
+    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={config.gemini_api_key}"
     
     response = requests.post(
         api_url,
@@ -56,7 +56,6 @@ def _call_gemini(prompt: str, schema: dict) -> dict:
     data = response.json()
 
     try:
-        # Достаем текст из стандартного ответа Gemini API
         text_content = data["candidates"][0]["content"]["parts"][0]["text"]
         return json.loads(text_content)
     except (KeyError, IndexError, json.JSONDecodeError) as e:
