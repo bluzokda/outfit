@@ -1,26 +1,39 @@
 {% extends "base.html" %}
-{% block title %}Гардероб{% endblock %}
 {% block content %}
-  <h1>Гардероб</h1>
-  <p class="lede">{{ items|length }} {{ 'вещь' if items|length == 1 else 'вещей' }} сохранено.</p>
-
-  <div class="actions">
-    <a href="{{ url_for('add_item') }}" class="btn primary">Добавить вещь</a>
-  </div>
-
-  {% if items %}
-    <div class="grid-items">
-      {% for item in items %}
-        <div class="item-card">
-          <img src="/{{ item.photo_path }}" alt="{{ category_labels.get(item.category, item.category) }}">
-          <div class="meta">
-            <span class="tag">{{ category_labels.get(item.category, item.category) }}</span>
-            {% if item.description %}<div>{{ item.description }}</div>{% endif %}
-          </div>
-        </div>
-      {% endfor %}
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+    <div>
+        <h1 class="text-3xl font-bold tracking-tight text-white">Мой гардероб</h1>
+        <p class="text-purple-300/70 text-sm mt-1">Все твои вещи в одном месте</p>
     </div>
-  {% else %}
-    <div class="empty-state">Пока пусто. Добавь первую вещь, чтобы образы собирались из твоего гардероба.</div>
-  {% endif %}
+    <a href="/wardrobe/add" class="px-5 py-2.5 rounded-xl font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 neon-glow transition transform hover:-translate-y-0.5 text-sm">
+        + Добавить вещь
+    </a>
+</div>
+
+{% if items %}
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        {% for item in items %}
+            <div class="glass-panel rounded-2xl overflow-hidden border border-purple-500/20 group hover:border-purple-500/50 transition duration-300">
+                <div class="aspect-square bg-purple-950/40 relative overflow-hidden">
+                    <img src="/{{ item.photo_path }}" alt="Вещь" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                    <span class="absolute top-2 left-2 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-purple-950/80 backdrop-blur-md text-purple-200 border border-purple-500/30">
+                        {{ category_labels.get(item.category, item.category) }}
+                    </span>
+                </div>
+                {% if item.description %}
+                    <div class="p-3">
+                        <p class="text-xs text-purple-200/90 truncate">{{ item.description }}</p>
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="glass-panel rounded-3xl p-12 text-center max-w-md mx-auto mt-12 border border-purple-500/20">
+        <div class="text-4xl mb-3">🧥</div>
+        <h3 class="text-lg font-semibold text-white mb-1">Гардероб пока пуст</h3>
+        <p class="text-sm text-purple-300/70 mb-6">Добавь свою первую вещь, чтобы начать создавать образы.</p>
+        <a href="/wardrobe/add" class="px-6 py-3 rounded-xl font-semibold text-white bg-purple-600 hover:bg-purple-500 transition shadow-lg">Добавить вещь</a>
+    </div>
+{% endif %}
 {% endblock %}
