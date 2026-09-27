@@ -49,82 +49,76 @@ class WeatherInfo:
         return self.condition_code in range(71, 78) or self.condition_code in (85, 86)
 
 def geocode_city(city_name: str) -> tuple[float, float, str] | None:
-    try:
-        resp = requests.get(
-            config.geocoding_api_url,
-            params={"name": city_name, "count": 5, "language": "ru"},
-            timeout=10,
-        )
-        data = resp.json()
-        results = data.get("results")
-        if not results:
-            return None
-        
-        best_r = results[0]
-        for r in results:
-            country = r.get("country", "")
-            if country in ["Россия", "Russia", "Беларусь", "Kazakhstan", "Казахстан"]:
-                best_r = r
-                break
-
-        full_name = f"{best_r['name']}, {best_r.get('country', '')}".strip(", ")
-        return best_r["latitude"], best_r["longitude"], full_name
-    except Exception:
+    resp = requests.get(
+        config.geocoding_api_url,
+        params={"name": city_name, "count": 5, "language": "ru"},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    results = data.get("results")
+    if not results:
         return None
 
+    best_r = results[0]
+    for r in results:
+        country = r.get("country", "")
+        if country in ["Россия", "Russia", "Беларусь", "Kazakhstan", "Казахстан"]:
+            best_r = r
+            break
+
+    full_name = f"{best_r['name']}, {best_r.get('country', '')}".strip(", ")
+    return best_r["latitude"], best_r["longitude"], full_name
+
 def get_weather(lat: float, lon: float, city: str | None = None) -> WeatherInfo:
-    try:
-        resp = requests.get(
-            config.weather_api_url,
-            params={
-                "latitude": lat,
-                "longitude": lon,
-                "hourly": "temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m",
-                "temperature_unit": "celsius",
-                "wind_speed_unit": "ms",
-                "forecast_days": 1
-            },
-            timeout=10,
-        )
-        data = resp.json()
-        if isinstance(data, dict) and "hourly" in data:
-            hourly = data["hourly"]
-            times = hourly.get("time", [])
-            
-            # Берем текущий час по локальному времени сервера или просто ищем ближайший элемент
-            # Так как времени много, возьмем индекс по текущему часу UTC+3 (или просто берем срез ближе к концу списка/середине)
-            import datetime
-            # Получаем текущий час (с учетом примерного московского времени UTC+3)
-            now_utc3 = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
-            target_time_str = now_utc3.strftime("%Y-%m-%dT%H:00")
-            
-            index = 0
-            for i, t in enumerate(times):
-                if t >= target_time_str:
-                    index = i
-                    break
-            if index >= len(times):
-                index = len(times) - 1
+    # ВАЖНО: указываем timezone=auto, иначе Open-Meteo отдаёт часы в GMT
+    # и наш расчёт текущего часа (который считает в UTC+3) съезжает.
+    resp = requests.get(
+        config.weather_api_url,
+        params={
+            "latitude": lat,
+            "longitude": lon,
+            "hourly": "temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m",
+            "temperature_unit": "celsius",
+            "wind_speed_unit": "ms",
+            "forecast_days": 1,
+            "timezone": "auto",
+        },
+        timeout=10,
+    )
+    resp.raise_for_status()
+    data = resp.json()
 
-            code = int(hourly.get("weather_code", [0])[index])
-            return WeatherInfo(
-                temperature=float(hourly.get("temperature_2m", [20.0])[index]),
-                feels_like=float(hourly.get("apparent_temperature", [20.0])[index]),
-                wind_speed=float(hourly.get("wind_speed_10m", [3.0])[index]),
-                precipitation=float(hourly.get("precipitation", [0.0])[index]),
-                condition_code=code,
-                condition_text=WEATHER_CODES.get(code, "ясно"),
-                city=city,
-            )
-    except Exception:
-        pass
+    if "hourly" not in data:
+        raise ValueError(f"Open-Meteo не вернул почасовые данные. Ответ: {data}")
 
+    hourly = data["hourly"]
+    times = hourly.get("time", [])
+    if not times:
+        raise ValueError(f"Open-Meteo вернул пустой список времени. Ответ: {data}")
+
+    # Locale-точное текущее время: Open-Meteo при timezone=auto отдаёт ещё и
+    # смещение в секундах для этой точки, используем его вместо жёстко
+    # зашитого UTC+3.
+    offset_seconds = data.get("utc_offset_seconds", 0)
+    now_local = datetime.datetime.utcnow() + datetime.timedelta(seconds=offset_seconds)
+    now_local_hour = now_local.strftime("%Y-%m-%dT%H:00")
+
+    index = 0
+    for i, t in enumerate(times):
+        if t >= now_local_hour:
+            index = i
+            break
+    else:
+        index = len(times) - 1
+
+    code = int(hourly["weather_code"][index])
     return WeatherInfo(
-        temperature=20.0,
-        feels_like=21.0,
-        wind_speed=1.2,
-        precipitation=0.0,
-        condition_code=0,
-        condition_text="ясно",
+        temperature=float(hourly["temperature_2m"][index]),
+        feels_like=float(hourly["apparent_temperature"][index]),
+        wind_speed=float(hourly["wind_speed_10m"][index]),
+        precipitation=float(hourly["precipitation"][index]),
+        condition_code=code,
+        condition_text=WEATHER_CODES.get(code, "неизвестно"),
         city=city,
     )
