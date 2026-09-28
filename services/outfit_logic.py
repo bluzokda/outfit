@@ -1,4 +1,5 @@
 import json
+import time
 import requests
 
 from config import config
@@ -89,51 +90,71 @@ def _apply_profile_filter(items, profile):
 
 
 def _call_gemini(prompt: str, schema: dict) -> dict:
-    """Запрос через актуальный Gemini Interactions API с защитой от ошибок (например, 503)."""
-    try:
-        response = requests.post(
-            config.gemini_api_url,
-            headers={
-                "x-goog-api-key": config.gemini_api_key,
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "gemini-3.5-flash-lite",
-                "input": prompt,
-                "response_format": {
-                    "type": "text",
-                    "mime_type": "application/json",
-                    "schema": schema,
+    """Запрос через актуальный Gemini Interactions API с автоматическим повтором при 503 и защитой от падений."""
+    max_retries = 3
+    backoff_factor = 2  # задержка будет расти: 2с, 4с, 8с...
+
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                config.gemini_api_url,
+                headers={
+                    "x-goog-api-key": config.gemini_api_key,
+                    "Content-Type": "application/json",
                 },
-            },
-            timeout=30,
-        )
-        response.raise_for_status()
-        data = response.json()
+                json={
+                    "model": "gemini-3.5-flash-lite",
+                    "input": prompt,
+                    "response_format": {
+                        "type": "text",
+                        "mime_type": "application/json",
+                        "schema": schema,
+                    },
+                },
+                timeout=30,
+            )
+            
+            # Если получили 503, вызываем исключение для перехвата в except и повтора
+            if response.status_code == 503:
+                raise requests.exceptions.HTTPError("503 Service Unavailable", response=response)
+                
+            response.raise_for_status()
+            data = response.json()
 
-        for step in data.get("steps", []):
-            if step.get("type") == "model_output":
-                for block in step.get("content", []):
-                    if block.get("type") == "text":
-                        return json.loads(block["text"])
+            for step in data.get("steps", []):
+                if step.get("type") == "model_output":
+                    for block in step.get("content", []):
+                        if block.get("type") == "text":
+                            return json.loads(block["text"])
 
-        raise ValueError(f"Не удалось извлечь ответ от Gemini: {data}")
+            raise ValueError(f"Не удалось извлечь ответ от Gemini: {data}")
 
-    except requests.exceptions.HTTPError as e:
-        print(f"Ошибка Gemini API (возможно, 503 Service Unavailable): {e}")
-        # Безопасный возврат ответа, чтобы сайт не падал с ошибкой 500
-        return {
-            "explanation": "В данный момент ИИ-стилист перегружен (ошибка сервера Google 503). Пожалуйста, попробуйте сгенерировать образ ещё раз через несколько секунд.",
-            "item_ids": [],
-            "recommendations": ["Рекомендуем надеть удобную одежду, соответствующую погоде."]
-        }
-    except Exception as e:
-        print(f"Непредвиденная ошибка при запросе к ИИ: {e}")
-        return {
-            "explanation": "Произошла временная ошибка при обращении к нейросети. Попробуйте повторить запрос.",
-            "item_ids": [],
-            "recommendations": []
-        }
+        except requests.exceptions.HTTPError as e:
+            if getattr(e, 'response', None) is not None and e.response.status_code == 503 and attempt < max_retries - 1:
+                sleep_time = backoff_factor ** (attempt + 1)
+                print(f"Gemini API вернул 503. Попытка {attempt + 1} из {max_retries}. Повтор через {sleep_time} сек...")
+                time.sleep(sleep_time)
+                continue
+            
+            print(f"Ошибка Gemini API: {e}")
+            return {
+                "explanation": "В данный момент ИИ-стилист перегружен (ошибка сервера Google 503). Пожалуйста, попробуйте сгенерировать образ ещё раз через несколько секунд.",
+                "item_ids": [],
+                "recommendations": ["Рекомендуем надеть удобную одежду, соответствующую погоде."]
+            }
+        except Exception as e:
+            print(f"Непредвиденная ошибка при запросе к ИИ: {e}")
+            return {
+                "explanation": "Произошла временная ошибка при обращении к нейросети. Попробуйте повторить запрос.",
+                "item_ids": [],
+                "recommendations": []
+            }
+
+    return {
+        "explanation": "Серверы Google временно недоступны после нескольких попыток. Повторите попытку позже.",
+        "item_ids": [],
+        "recommendations": []
+    }
 
 
 def build_outfit(occasion: str, weather: WeatherInfo, wardrobe_items, profile=None) -> OutfitResult:
