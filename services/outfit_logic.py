@@ -85,7 +85,8 @@ def _apply_profile_filter(items, profile):
     if not profile:
         return items
     if profile.get("gender") == "male":
-        return [i for i in items if i.get("category"] != "dress"]
+        # Исправлена опечатка со скобками в get(...)
+        return [i for i in items if i.get("category") != "dress"]
     return items
 
 
@@ -111,7 +112,7 @@ def _call_gemini(prompt: str, schema: dict) -> dict:
                         "schema": schema,
                     },
                 },
-                timeout=8,  # Безопасный короткий таймаут, чтобы укладываться в лимиты Gunicorn
+                timeout=8,  # Безопасный короткий таймаут
             )
             
             if response.status_code == 503:
