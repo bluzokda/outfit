@@ -85,14 +85,14 @@ def _apply_profile_filter(items, profile):
     if not profile:
         return items
     if profile.get("gender") == "male":
-        return [i for i in items if i.get("category") != "dress"]
+        return [i for i in items if i.get("category"] != "dress"]
     return items
 
 
 def _call_gemini(prompt: str, schema: dict) -> dict:
-    """Запрос к Gemini API с защитой от любых сетевых сбоев, таймаутов и падений воркера."""
+    """Запрос к Gemini API с коротким таймаутом и защитой от падения воркера Gunicorn."""
     max_retries = 3
-    backoff_factor = 2  # задержка: 2с, 4с
+    backoff_factor = 1  # быстрая задержка: 1с, 2с
 
     for attempt in range(max_retries):
         try:
@@ -111,7 +111,7 @@ def _call_gemini(prompt: str, schema: dict) -> dict:
                         "schema": schema,
                     },
                 },
-                timeout=25,  # уменьшенный таймаут, чтобы не висеть дольше лимитов Render
+                timeout=8,  # Безопасный короткий таймаут, чтобы укладываться в лимиты Gunicorn
             )
             
             if response.status_code == 503:
@@ -131,25 +131,22 @@ def _call_gemini(prompt: str, schema: dict) -> dict:
         except (requests.exceptions.HTTPError, requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
             status_code = getattr(getattr(e, 'response', None), 'status_code', None)
             
-            # Если это 503 ошибка и у нас еще остались попытки — повторяем
             if (status_code == 503 or isinstance(e, (requests.exceptions.Timeout, requests.exceptions.ConnectionError))) and attempt < max_retries - 1:
-                sleep_time = backoff_factor ** (attempt + 1)
-                print(f"Ошибка соединения с Gemini ({e}). Попытка {attempt + 1} из {max_retries}. Повтор через {sleep_time} сек...")
+                sleep_time = backoff_factor * (attempt + 1)
+                print(f"Предупреждение Gemini ({e}). Попытка {attempt + 1} из {max_retries}. Повтор через {sleep_time} сек...")
                 time.sleep(sleep_time)
                 continue
             
-            print(f"Ошибка при обращении к Gemini API: {e}")
+            print(f"Ошибка запроса к Gemini API: {e}")
             break
         except Exception as e:
-            # Абсолютно любая другая непредвиденная ошибка (включая проблемы с сокетами/SSL) перехватывается здесь
-            print(f"Критическая ошибка сети/парсинга: {e}")
+            print(f"Непредвиденная ошибка сети: {e}")
             break
 
-    # Если все попытки исчерпаны или произошел сбой, возвращаем безопасный ответ вместо падения сервера
     return {
-        "explanation": "Серверы Google временно перегружены или недоступны (ошибка соединения / таймаут). Пожалуйста, нажмите «Сгенерировать образ» еще раз через несколько секунд.",
+        "explanation": "Серверы Google временно не отвечают (таймаут соединения). Пожалуйста, нажмите кнопку генерации еще раз.",
         "item_ids": [],
-        "recommendations": ["Рекомендуем надеть удобную одежду по погоде."]
+        "recommendations": ["Рекомендуем надеть комфортную одежду по погоде."]
     }
 
 
