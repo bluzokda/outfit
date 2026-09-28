@@ -1,19 +1,28 @@
 import os
 import uuid
 import traceback
+from datetime import timedelta
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.utils import secure_filename
 
 from config import config
 from database import init_db
-from repository import add_wardrobe_item, delete_wardrobe_item, get_wardrobe, save_outfit_history
+from repository import (
+    add_wardrobe_item,
+    delete_wardrobe_item,
+    get_profile,
+    get_wardrobe,
+    save_outfit_history,
+    save_profile,
+)
 from services.collage import build_collage
 from services.outfit_logic import build_outfit
 from services.weather import geocode_city, get_weather
 
 app = Flask(__name__)
 app.secret_key = config.secret_key
+app.permanent_session_lifetime = timedelta(days=365)
 
 init_db()
 
@@ -26,10 +35,29 @@ CATEGORY_LABELS = {
     "accessory": "Аксессуар",
 }
 
+STYLE_OPTIONS = {
+    "casual": "Повседневный",
+    "classic": "Классика",
+    "sport": "Спортивный",
+    "streetwear": "Стритвир",
+    "minimal": "Минимализм",
+    "business": "Деловой",
+    "vintage": "Винтаж",
+    "cozy": "Уютный / оверсайз",
+}
+
 def get_session_id() -> str:
     if "session_id" not in session:
         session["session_id"] = uuid.uuid4().hex
+    session.permanent = True
     return session["session_id"]
+
+@app.context_processor
+def inject_profile_flag():
+    """Флаг для шаблонов: заполнен ли профиль (чтобы показать подсказку)."""
+    sid = session.get("session_id")
+    profile = get_profile(sid) if sid else None
+    return {"has_profile": bool(profile and (profile.get("gender") or profile.get("age")))}
 
 @app.route("/")
 def index():
@@ -73,6 +101,39 @@ def delete_item(item_id):
             pass
     return redirect(url_for("wardrobe"))
 
+@app.route("/settings", methods=["GET", "POST"])
+def settings():
+    session_id = get_session_id()
+
+    if request.method == "POST":
+        gender = request.form.get("gender")
+        if gender not in ("male", "female"):
+            gender = None
+
+        age = None
+        try:
+            age_value = int(request.form.get("age", "").strip())
+            if 5 <= age_value <= 100:
+                age = age_value
+        except ValueError:
+            pass
+
+        styles = [k for k in request.form.getlist("styles") if k in STYLE_OPTIONS]
+        notes = request.form.get("notes", "").strip()[:500]
+
+        save_profile(session_id, gender, age, ",".join(styles), notes)
+        return redirect(url_for("settings", saved=1))
+
+    profile = get_profile(session_id) or {}
+    selected_styles = [k for k in (profile.get("styles") or "").split(",") if k]
+    return render_template(
+        "settings.html",
+        profile=profile,
+        selected_styles=selected_styles,
+        style_options=STYLE_OPTIONS,
+        saved=request.args.get("saved"),
+    )
+
 @app.route("/outfit", methods=["GET", "POST"])
 def outfit_form():
     if request.method == "POST":
@@ -100,7 +161,8 @@ def outfit_form():
             wardrobe_items = get_wardrobe(session_id)
             
             # Генерация образа
-            result = build_outfit(occasion, weather, wardrobe_items)
+            profile = get_profile(session_id)
+            result = build_outfit(occasion, weather, wardrobe_items, profile)
 
             collage_url = None
             collage_path = None

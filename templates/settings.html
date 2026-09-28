@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-lg mx-auto glass-panel rounded-3xl p-8 sm:p-10 border border-purple-500/30 shadow-2xl animate-fade-in">
+    <div class="text-center mb-8">
+        <h1 class="text-2xl font-black text-white mb-2">Параметры</h1>
+        <p class="text-xs text-purple-300/70">ИИ будет подбирать образы с учётом этих данных</p>
+    </div>
+
+    {% if saved %}
+        <div class="mb-6 p-4 rounded-2xl bg-emerald-950/70 border border-emerald-500/40 text-emerald-200 text-xs shadow-lg flex items-center gap-2">
+            <span>✅</span> Параметры сохранены. Теперь советы стилиста будут точнее.
+        </div>
+    {% endif %}
+
+    <form method="POST" class="space-y-7">
+        <!-- Пол -->
+        <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-purple-300 mb-3">Пол</label>
+            <div class="grid grid-cols-2 gap-3">
+                <label class="cursor-pointer">
+                    <input type="radio" name="gender" value="male" class="peer sr-only" {% if profile.gender == 'male' %}checked{% endif %}>
+                    <div class="text-center py-3.5 rounded-2xl bg-purple-950/60 border border-purple-500/30 text-purple-200 text-sm font-medium transition hover:border-purple-400 peer-checked:bg-gradient-to-r peer-checked:from-purple-600 peer-checked:to-indigo-600 peer-checked:text-white peer-checked:border-purple-300 peer-checked:shadow-lg">
+                        👔 Мужской
+                    </div>
+                </label>
+                <label class="cursor-pointer">
+                    <input type="radio" name="gender" value="female" class="peer sr-only" {% if profile.gender == 'female' %}checked{% endif %}>
+                    <div class="text-center py-3.5 rounded-2xl bg-purple-950/60 border border-purple-500/30 text-purple-200 text-sm font-medium transition hover:border-purple-400 peer-checked:bg-gradient-to-r peer-checked:from-purple-600 peer-checked:to-indigo-600 peer-checked:text-white peer-checked:border-purple-300 peer-checked:shadow-lg">
+                        👗 Женский
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Возраст -->
+        <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-purple-300 mb-2">Возраст</label>
+            <input type="number" name="age" min="5" max="100" value="{{ profile.age or '' }}" placeholder="Напр.: 21"
+                class="w-full px-4 py-3.5 rounded-2xl bg-purple-950/60 border border-purple-500/30 text-white placeholder-purple-400/30 focus:outline-none focus:border-purple-400 transition text-sm shadow-inner">
+        </div>
+
+        <!-- Стили -->
+        <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-purple-300 mb-3">Любимые стили</label>
+            <div class="flex flex-wrap gap-2.5">
+                {% for key, label in style_options.items() %}
+                    <label class="cursor-pointer">
+                        <input type="checkbox" name="styles" value="{{ key }}" class="peer sr-only" {% if key in selected_styles %}checked{% endif %}>
+                        <span class="inline-block px-4 py-2 rounded-full bg-purple-950/60 border border-purple-500/30 text-purple-200 text-xs font-medium transition hover:border-purple-400 peer-checked:bg-purple-600 peer-checked:text-white peer-checked:border-purple-300">
+                            {{ label }}
+                        </span>
+                    </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Свободные пожелания -->
+        <div>
+            <label class="block text-xs font-semibold uppercase tracking-wider text-purple-300 mb-2">Личные пожелания</label>
+            <textarea name="notes" rows="3" maxlength="500" placeholder="Напр.: не ношу яркое, люблю свободные вещи, часто мёрзну"
+                class="w-full px-4 py-3.5 rounded-2xl bg-purple-950/60 border border-purple-500/30 text-white placeholder-purple-400/30 focus:outline-none focus:border-purple-400 transition text-sm shadow-inner resize-none">{{ profile.notes or '' }}</textarea>
+            <p class="text-[11px] text-purple-400/50 mt-1.5">До 500 символов. ИИ будет соблюдать эти ограничения.</p>
+        </div>
+
+        <button type="submit" class="w-full py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 neon-glow transition transform hover:-translate-y-0.5 shadow-xl">
+            Сохранить параметры ✨
+        </button>
+    </form>
+</div>
+{% endblock %}

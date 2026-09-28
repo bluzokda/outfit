@@ -17,6 +17,13 @@
         <p class="text-xs text-purple-300/70">ИИ учтет погоду и цели твоего выхода</p>
     </div>
 
+    {% if not has_profile %}
+        <a href="/settings" class="mb-6 p-4 rounded-2xl bg-indigo-950/70 border border-indigo-400/40 text-indigo-200 text-xs shadow-lg flex items-center gap-3 hover:border-indigo-300 transition">
+            <span class="text-lg">⚙️</span>
+            <span>Укажи пол, возраст и предпочтения в <strong>Параметрах</strong> — тогда советы будут точнее.</span>
+        </a>
+    {% endif %}
+
     {% if error %}
         <div class="mb-6 p-4 rounded-2xl bg-red-950/80 border border-red-500/50 text-red-200 text-xs shadow-lg">
             {{ error }}

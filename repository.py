@@ -39,3 +39,26 @@ def save_outfit_history(session_id, occasion, city, temperature, weather_conditi
     )
     db.commit()
     db.close()
+
+
+def get_profile(session_id: str):
+    db = get_db()
+    row = db.execute("SELECT * FROM user_profiles WHERE session_id = ?", (session_id,)).fetchone()
+    db.close()
+    return dict(row) if row else None
+
+def save_profile(session_id: str, gender, age, styles: str, notes: str):
+    db = get_db()
+    db.execute(
+        """INSERT INTO user_profiles (session_id, gender, age, styles, notes, updated_at)
+           VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+           ON CONFLICT(session_id) DO UPDATE SET
+               gender = excluded.gender,
+               age = excluded.age,
+               styles = excluded.styles,
+               notes = excluded.notes,
+               updated_at = CURRENT_TIMESTAMP""",
+        (session_id, gender, age, styles, notes),
+    )
+    db.commit()
+    db.close()

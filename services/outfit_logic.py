@@ -32,6 +32,63 @@ def _items_to_prompt_list(items):
     return "\n".join(lines) if lines else "(гардероб пуст)"
 
 
+GENDER_TEXT = {"male": "мужской", "female": "женский"}
+
+STYLE_TEXT = {
+    "casual": "повседневный",
+    "classic": "классика",
+    "sport": "спортивный",
+    "streetwear": "стритвир",
+    "minimal": "минимализм",
+    "business": "деловой",
+    "vintage": "винтаж",
+    "cozy": "уютный/оверсайз",
+}
+
+
+def _profile_block(profile) -> str:
+    """Текстовый блок с данными пользователя для промпта."""
+    if not profile:
+        return ""
+
+    lines = []
+    gender = GENDER_TEXT.get(profile.get("gender"))
+    if gender:
+        lines.append(f"- Пол: {gender}")
+    if profile.get("age"):
+        lines.append(f"- Возраст: {profile['age']}")
+    styles = [STYLE_TEXT.get(k, k) for k in (profile.get("styles") or "").split(",") if k]
+    if styles:
+        lines.append(f"- Любимые стили: {', '.join(styles)}")
+    if profile.get("notes"):
+        lines.append(f"- Личные пожелания и ограничения: {profile['notes']}")
+
+    if not lines:
+        return ""
+
+    block = "Профиль пользователя:\n" + "\n".join(lines) + "\n\n"
+    block += (
+        "СТРОГО учитывай профиль. Предлагай только те вещи, которые подходят "
+        "пользователю по полу и возрасту"
+    )
+    if gender:
+        block += (
+            f" (пол — {gender}: не предлагай одежду, которую обычно носит "
+            "противоположный пол, например юбки и платья мужчине)"
+        )
+    block += ". Следуй любимым стилям и обязательно соблюдай личные ограничения.\n\n"
+    return block
+
+
+def _apply_profile_filter(items, profile):
+    """Жёсткая проверка в коде — на случай, если модель ошибётся."""
+    if not profile:
+        return items
+    if profile.get("gender") == "male":
+        return [i for i in items if i.get("category") != "dress"]
+    return items
+
+
 def _call_gemini(prompt: str, schema: dict) -> dict:
     """Запрос через актуальный Gemini Interactions API (generateContent + модели 1.5/2.x
     ограничены Google для новых проектов и возвращают 404)."""
@@ -64,15 +121,17 @@ def _call_gemini(prompt: str, schema: dict) -> dict:
     raise ValueError(f"Не удалось извлечь ответ от Gemini: {data}")
 
 
-def build_outfit(occasion: str, weather: WeatherInfo, wardrobe_items) -> OutfitResult:
+def build_outfit(occasion: str, weather: WeatherInfo, wardrobe_items, profile=None) -> OutfitResult:
     filtered = filter_items_by_weather(wardrobe_items, weather)
+    filtered = _apply_profile_filter(filtered, profile)
+    profile_text = _profile_block(profile)
     has_wardrobe = len(wardrobe_items) > 0
 
     base_context = (
         f"Ты — персональный стилист. Погода: {weather.temperature}°C "
         f"(ощущается как {weather.feels_like}°C), {weather.condition_text}, "
         f"ветер {weather.wind_speed} м/с. Повод: {occasion}.\n\n"
-    )
+    ) + profile_text
 
     if has_wardrobe:
         prompt = base_context + (
@@ -80,7 +139,9 @@ def build_outfit(occasion: str, weather: WeatherInfo, wardrobe_items) -> OutfitR
             f"{_items_to_prompt_list(filtered)}\n\n"
             "Выбери набор вещей (по одной из подходящих категорий: outerwear/top/"
             "bottom/dress/shoes, плюс опционально accessory), которые вместе "
-            "составляют цельный образ под повод и погоду."
+            "составляют цельный образ под повод и погоду. Если вещь по описанию "
+            "или категории не подходит пользователю по полу или ограничениям — "
+            "не выбирай её."
         )
         schema = {
             "type": "object",
@@ -91,7 +152,10 @@ def build_outfit(occasion: str, weather: WeatherInfo, wardrobe_items) -> OutfitR
             "required": ["item_ids", "explanation"],
         }
         result = _call_gemini(prompt, schema)
-        return OutfitResult(item_ids=result.get("item_ids", []), explanation=result.get("explanation", ""))
+        # оставляем только id, реально присутствующие среди допустимых вещей
+        valid_ids = {i["id"] for i in filtered}
+        item_ids = [i for i in result.get("item_ids", []) if i in valid_ids]
+        return OutfitResult(item_ids=item_ids, explanation=result.get("explanation", ""))
 
     prompt = base_context + (
         "У пользователя нет сохранённого гардероба. Дай общие рекомендации по "
