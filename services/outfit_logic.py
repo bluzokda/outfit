@@ -90,9 +90,9 @@ def _apply_profile_filter(items, profile):
 
 
 def _call_gemini(prompt: str, schema: dict) -> dict:
-    """Запрос через актуальный Gemini Interactions API с автоматическим повтором при 503 и защитой от падений."""
+    """Запрос к Gemini API с защитой от любых сетевых сбоев, таймаутов и падений воркера."""
     max_retries = 3
-    backoff_factor = 2  # задержка будет расти: 2с, 4с, 8с...
+    backoff_factor = 2  # задержка: 2с, 4с
 
     for attempt in range(max_retries):
         try:
@@ -111,10 +111,9 @@ def _call_gemini(prompt: str, schema: dict) -> dict:
                         "schema": schema,
                     },
                 },
-                timeout=30,
+                timeout=25,  # уменьшенный таймаут, чтобы не висеть дольше лимитов Render
             )
             
-            # Если получили 503, вызываем исключение для перехвата в except и повтора
             if response.status_code == 503:
                 raise requests.exceptions.HTTPError("503 Service Unavailable", response=response)
                 
@@ -129,31 +128,28 @@ def _call_gemini(prompt: str, schema: dict) -> dict:
 
             raise ValueError(f"Не удалось извлечь ответ от Gemini: {data}")
 
-        except requests.exceptions.HTTPError as e:
-            if getattr(e, 'response', None) is not None and e.response.status_code == 503 and attempt < max_retries - 1:
+        except (requests.exceptions.HTTPError, requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            status_code = getattr(getattr(e, 'response', None), 'status_code', None)
+            
+            # Если это 503 ошибка и у нас еще остались попытки — повторяем
+            if (status_code == 503 or isinstance(e, (requests.exceptions.Timeout, requests.exceptions.ConnectionError))) and attempt < max_retries - 1:
                 sleep_time = backoff_factor ** (attempt + 1)
-                print(f"Gemini API вернул 503. Попытка {attempt + 1} из {max_retries}. Повтор через {sleep_time} сек...")
+                print(f"Ошибка соединения с Gemini ({e}). Попытка {attempt + 1} из {max_retries}. Повтор через {sleep_time} сек...")
                 time.sleep(sleep_time)
                 continue
             
-            print(f"Ошибка Gemini API: {e}")
-            return {
-                "explanation": "В данный момент ИИ-стилист перегружен (ошибка сервера Google 503). Пожалуйста, попробуйте сгенерировать образ ещё раз через несколько секунд.",
-                "item_ids": [],
-                "recommendations": ["Рекомендуем надеть удобную одежду, соответствующую погоде."]
-            }
+            print(f"Ошибка при обращении к Gemini API: {e}")
+            break
         except Exception as e:
-            print(f"Непредвиденная ошибка при запросе к ИИ: {e}")
-            return {
-                "explanation": "Произошла временная ошибка при обращении к нейросети. Попробуйте повторить запрос.",
-                "item_ids": [],
-                "recommendations": []
-            }
+            # Абсолютно любая другая непредвиденная ошибка (включая проблемы с сокетами/SSL) перехватывается здесь
+            print(f"Критическая ошибка сети/парсинга: {e}")
+            break
 
+    # Если все попытки исчерпаны или произошел сбой, возвращаем безопасный ответ вместо падения сервера
     return {
-        "explanation": "Серверы Google временно недоступны после нескольких попыток. Повторите попытку позже.",
+        "explanation": "Серверы Google временно перегружены или недоступны (ошибка соединения / таймаут). Пожалуйста, нажмите «Сгенерировать образ» еще раз через несколько секунд.",
         "item_ids": [],
-        "recommendations": []
+        "recommendations": ["Рекомендуем надеть удобную одежду по погоде."]
     }
 
 
@@ -189,7 +185,6 @@ def build_outfit(occasion: str, weather: WeatherInfo, wardrobe_items, profile=No
         }
         result = _call_gemini(prompt, schema)
         
-        # Если сработал перехват ошибки, возвращаем структуру с текстом-предупреждением
         if "recommendations" in result and not result.get("item_ids"):
             return OutfitResult(
                 item_ids=[], 
@@ -197,7 +192,6 @@ def build_outfit(occasion: str, weather: WeatherInfo, wardrobe_items, profile=No
                 generic_recommendations=result.get("recommendations", [])
             )
 
-        # оставляем только id, реально присутствующие среди допустимых вещей
         valid_ids = {i["id"] for i in filtered}
         item_ids = [i for i in result.get("item_ids", []) if i in valid_ids]
         return OutfitResult(item_ids=item_ids, explanation=result.get("explanation", ""))
