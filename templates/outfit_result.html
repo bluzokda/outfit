@@ -15,12 +15,6 @@
         {% endif %}
     </div>
 
-    {% if collage_url %}
-        <div class="rounded-2xl overflow-hidden border border-purple-500/40 bg-purple-950/60 p-3 flex justify-center shadow-xl group">
-            <img src="{{ collage_url }}" alt="Коллаж одежды" class="max-h-[420px] rounded-xl object-contain group-hover:scale-[1.02] transition duration-500">
-        </div>
-    {% endif %}
-
     <div>
         <h3 class="text-xs font-bold uppercase tracking-wider text-purple-400 mb-3 flex items-center gap-2">
             <span>✨</span> Совет стилиста
@@ -30,20 +24,117 @@
         </div>
     </div>
 
-    {% if recommendations %}
-        <div>
-            <h3 class="text-xs font-bold uppercase tracking-wider text-purple-400 mb-3 flex items-center gap-2">
-                <span>💡</span> Дополнительные рекомендации
-            </h3>
-            <ul class="space-y-2 text-sm text-purple-200/90">
-                {% for rec in recommendations %}
-                    <li class="flex items-start gap-2.5 bg-purple-950/30 p-3 rounded-xl border border-purple-500/10">
-                        <span class="text-purple-400 mt-0.5">•</span>
-                        <span>{{ rec }}</span>
-                    </li>
+    {% if slots %}
+    <div>
+        <h3 class="text-xs font-bold uppercase tracking-wider text-purple-400 mb-3 flex items-center gap-2">
+            <span>🪄</span> Визуализация образа
+            <span class="normal-case font-normal text-purple-400/60">— нажимай на варианты, чтобы заменить вещь</span>
+        </h3>
+
+        {% if mode == "wardrobe" %}
+            <!-- Интерактивный коллаж из реальных фото вещей пользователя -->
+            <div class="rounded-2xl border border-purple-500/30 bg-purple-950/50 p-5 shadow-inner">
+                <div id="flatlayBoard" class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+                    {% for slot in slots %}
+                        <div class="flex flex-col items-center">
+                            <div class="w-full aspect-square rounded-2xl overflow-hidden border border-purple-500/30 bg-purple-900/40 shadow-lg">
+                                <img id="board-{{ slot.category }}"
+                                     src="/{{ slot.options[0].photo_path }}"
+                                     alt="{{ category_labels.get(slot.category, slot.category) }}"
+                                     class="w-full h-full object-cover transition duration-300">
+                            </div>
+                            <span class="mt-2 text-[10px] uppercase tracking-wider text-purple-400/70">{{ slot_icons.get(slot.category, '') }} {{ category_labels.get(slot.category, slot.category) }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                {% for slot in slots %}
+                    {% if slot.options|length > 1 %}
+                        <div class="mb-4 last:mb-0">
+                            <p class="text-[11px] text-purple-400/70 mb-2">{{ slot_icons.get(slot.category, '') }} {{ category_labels.get(slot.category, slot.category) }} — другие варианты из гардероба</p>
+                            <div class="flex gap-2.5 overflow-x-auto pb-1">
+                                {% for opt in slot.options %}
+                                    <button type="button"
+                                        onclick="document.getElementById('board-{{ slot.category }}').src = '/{{ opt.photo_path }}'; document.querySelectorAll('.swap-{{ slot.category }}').forEach(el => el.classList.remove('ring-2','ring-purple-400')); this.classList.add('ring-2','ring-purple-400');"
+                                        class="swap-{{ slot.category }} shrink-0 w-16 h-16 rounded-xl overflow-hidden border border-purple-500/30 {% if opt.recommended %}ring-2 ring-purple-400{% endif %} transition hover:border-purple-400"
+                                        title="{{ opt.description }}">
+                                        <img src="/{{ opt.photo_path }}" alt="" class="w-full h-full object-cover">
+                                    </button>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
                 {% endfor %}
-            </ul>
-        </div>
+            </div>
+
+            {% if collage_url %}
+                <details class="mt-4">
+                    <summary class="text-[11px] text-purple-400/60 cursor-pointer hover:text-purple-300 transition">Показать исходный коллаж от стилиста</summary>
+                    <div class="mt-3 rounded-2xl overflow-hidden border border-purple-500/30 bg-purple-950/60 p-3 flex justify-center">
+                        <img src="{{ collage_url }}" alt="Коллаж одежды" class="max-h-80 rounded-xl object-contain">
+                    </div>
+                </details>
+            {% endif %}
+
+        {% else %}
+            <!-- Манекен: гардероба нет, показываем силуэты категорий с вариантами названий -->
+            <div class="rounded-2xl border border-purple-500/30 bg-purple-950/50 p-6 shadow-inner">
+                <div class="flex flex-col items-center mb-6">
+                    <svg width="120" height="220" viewBox="0 0 120 220" class="mb-2 opacity-80">
+                        <circle cx="60" cy="28" r="22" fill="rgba(168,85,247,0.35)" stroke="rgba(168,85,247,0.6)" stroke-width="2"/>
+                        <path d="M30 60 Q60 45 90 60 L96 150 Q60 168 24 150 Z" fill="rgba(99,102,241,0.28)" stroke="rgba(168,85,247,0.5)" stroke-width="2"/>
+                        <path d="M28 150 L22 210 M92 150 L98 210" stroke="rgba(168,85,247,0.5)" stroke-width="10" stroke-linecap="round" fill="none"/>
+                    </svg>
+                    <p id="outfitSummary" class="text-center text-sm text-purple-200 font-medium max-w-xs"></p>
+                </div>
+
+                {% for slot in slots %}
+                    <div class="mb-5 last:mb-0">
+                        <p class="text-[11px] uppercase tracking-wider text-purple-400/70 mb-2">{{ slot_icons.get(slot.category, '') }} {{ category_labels.get(slot.category, slot.category) }}</p>
+                        <div class="flex flex-wrap gap-2.5">
+                            {% for opt in slot.options %}
+                                <button type="button"
+                                    data-slot="{{ slot.category }}"
+                                    data-label="{{ slot_icons.get(slot.category, '') }} {{ opt }}"
+                                    onclick="pickGenericOption(this)"
+                                    class="generic-opt generic-opt-{{ slot.category }} px-4 py-2 rounded-full bg-purple-950/60 border border-purple-500/30 text-purple-200 text-xs font-medium transition hover:border-purple-400 {% if loop.first %}bg-purple-600 text-white border-purple-300{% endif %}">
+                                    {{ opt }}
+                                </button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <script>
+                function pickGenericOption(btn) {
+                    const slot = btn.dataset.slot;
+                    document.querySelectorAll('.generic-opt-' + slot).forEach(el => {
+                        el.classList.remove('bg-purple-600', 'text-white', 'border-purple-300');
+                        el.classList.add('bg-purple-950/60', 'text-purple-200');
+                    });
+                    btn.classList.remove('bg-purple-950/60', 'text-purple-200');
+                    btn.classList.add('bg-purple-600', 'text-white', 'border-purple-300');
+                    updateOutfitSummary();
+                }
+
+                function updateOutfitSummary() {
+                    const parts = [];
+                    document.querySelectorAll('[data-slot]').forEach(function () {});
+                    const slots = {};
+                    document.querySelectorAll('.generic-opt').forEach(function (btn) {
+                        if (btn.classList.contains('bg-purple-600')) {
+                            slots[btn.dataset.slot] = btn.dataset.label;
+                        }
+                    });
+                    Object.values(slots).forEach(v => parts.push(v));
+                    const el = document.getElementById('outfitSummary');
+                    if (el) el.textContent = parts.join('  +  ');
+                }
+                document.addEventListener('DOMContentLoaded', updateOutfitSummary);
+            </script>
+        {% endif %}
+    </div>
     {% endif %}
 
     <div class="pt-4 flex flex-col sm:flex-row gap-4">
