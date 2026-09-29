@@ -2,10 +2,11 @@ import os
 import uuid
 import gc
 from google import genai
+from google.genai import types
 from config import config
 
 def generate_imagen_look(gender: str = None, age: int = None, items_description: list[str] = None, occasion: str = "") -> str | None:
-    """Генерирует фото образа с помощью нативных возможностей Gemini / Google GenAI."""
+    """Генерирует фото образа через generate_content с поддержкой вывода изображений."""
     if not config.gemini_api_key:
         print("GEMINI_API_KEY не установлен в переменных окружения.")
         return None
@@ -18,38 +19,43 @@ def generate_imagen_look(gender: str = None, age: int = None, items_description:
         age_str = f"{age}-year-old" if age else "young adult"
 
         prompt = (
-            f"Generate a full-body aesthetic fashion editorial photograph of a {age_str} {gender_str} model. "
+            f"Generate a high-quality, full-body fashion editorial photograph of a {age_str} {gender_str} model. "
             f"Wearing: {clothes_str}. "
             f"Occasion / Vibe: {occasion}. "
             f"Minimalist studio background, clean ambient lighting, highly detailed clothing fabric textures, realistic fit, high quality, 4k resolution."
         )
 
-        # Используем актуальный метод генерации изображений через клиент Google GenAI
-        result = client.models.generate_images(
-            model='gemini-2.5-flash',
-            prompt=prompt,
-            config=dict(
-                number_of_images=1,
-                aspect_ratio="3:4",
-                output_mime_type="image/jpeg",
+        # Запрос генерации через стандартный generate_content с модальностью IMAGE
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE", "TEXT"]
             )
         )
 
-        os.makedirs(config.collages_dir, exist_ok=True)
-        
-        for generated_image in result.generated_images:
-            filename = f"imagen_{uuid.uuid4().hex}.jpg"
-            file_path = os.path.join(config.collages_dir, filename)
+        # Перебираем части ответа в поисках сгенерированного изображения
+        if response.candidates:
+            for candidate in response.candidates:
+                if candidate.content and candidate.content.parts:
+                    for part in candidate.content.parts:
+                        if part.inline_data and part.inline_data.mime_type.startswith("image/"):
+                            image_bytes = part.inline_data.data
 
-            with open(file_path, "wb") as f:
-                f.write(generated_image.image.image_bytes)
+                            os.makedirs(config.collages_dir, exist_ok=True)
+                            filename = f"imagen_{uuid.uuid4().hex}.jpg"
+                            file_path = os.path.join(config.collages_dir, filename)
 
-            gc.collect()
-            return "/" + file_path.replace(os.sep, "/")
+                            with open(file_path, "wb") as f:
+                                f.write(image_bytes)
 
+                            gc.collect()
+                            return "/" + file_path.replace(os.sep, "/")
+
+        print("Модель не вернула изображение в ответе.")
         return None
 
     except Exception as e:
-        print(f"Ошибка при генерации изображения через Gemini SDK: {e}")
+        print(f"Ошибка при генерации изображения через Gemini generate_content: {e}")
         gc.collect()
         return None
