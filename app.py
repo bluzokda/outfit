@@ -46,6 +46,15 @@ STYLE_OPTIONS = {
     "cozy": "Уютный / оверсайз",
 }
 
+SLOT_ICONS = {
+    "outerwear": "🧥",
+    "top": "👕",
+    "bottom": "👖",
+    "dress": "👗",
+    "shoes": "👟",
+    "accessory": "🧣",
+}
+
 def get_session_id() -> str:
     if "session_id" not in session:
         session["session_id"] = uuid.uuid4().hex
@@ -190,7 +199,10 @@ def outfit_form():
                 occasion=occasion,
                 explanation=result.explanation,
                 collage_url=collage_url,
-                recommendations=result.generic_recommendations,
+                mode=result.mode,
+                slots=result.slots,
+                category_labels=CATEGORY_LABELS,
+                slot_icons=SLOT_ICONS,
             )
         except Exception as e:
             # Вывод подробного текста ошибки на экран
