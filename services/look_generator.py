@@ -6,7 +6,7 @@ import requests
 from config import config
 
 def generate_imagen_look(gender: str = None, age: int = None, items_description: list[str] = None, occasion: str = "") -> str | None:
-    """Генерирует фото образа через Imagen 3 REST API (генерация через :generateImages)."""
+    """Генерирует фото образа через Imagen 3 REST API (Google AI Studio)."""
     if not config.gemini_api_key:
         print("GEMINI_API_KEY не установлен в переменных окружения.")
         return None
@@ -23,30 +23,35 @@ def generate_imagen_look(gender: str = None, age: int = None, items_description:
             f"Minimalist studio background, clean ambient lighting, highly detailed clothing fabric textures, realistic fit, high quality, 4k."
         )
 
-        # Актуальный REST URL для генерации изображений через AI Studio
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:generateImages?key={config.gemini_api_key}"
+        # Используем валидный эндпоинт и наименование модели imagen-3.0-generate-001
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key={config.gemini_api_key}"
         
         payload = {
-            "prompt": prompt,
-            "config": {
-                "numberOfImages": 1,
+            "instances": [
+                {"prompt": prompt}
+            ],
+            "parameters": {
+                "sampleCount": 1,
                 "aspectRatio": "3:4",
                 "outputMimeType": "image/jpeg"
             }
         }
 
         response = requests.post(url, json=payload, timeout=60)
-        response.raise_for_status()
+        
+        # Печатаем тело ответа при ошибке для быстрой отладки
+        if not response.ok:
+            print(f"Ошибка Imagen API ({response.status_code}): {response.text}")
+            response.raise_for_status()
+
         data = response.json()
 
-        # Извлекаем сгенерированные изображения
-        generated_images = data.get("generatedImages", [])
-        if not generated_images:
+        predictions = data.get("predictions", [])
+        if not predictions:
             print("Imagen API не вернул изображение:", data)
             return None
 
-        # Считываем Base64 из структуры ответа
-        image_b64 = generated_images[0].get("image", {}).get("imageBytes")
+        image_b64 = predictions[0].get("bytesBase64Encoded")
         del data
         del payload
 
@@ -56,7 +61,6 @@ def generate_imagen_look(gender: str = None, age: int = None, items_description:
         image_bytes = base64.b64decode(image_b64)
         del image_b64
 
-        # Сохраняем в static/collages/
         os.makedirs(config.collages_dir, exist_ok=True)
         filename = f"imagen_{uuid.uuid4().hex}.jpg"
         file_path = os.path.join(config.collages_dir, filename)
