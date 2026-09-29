@@ -1,11 +1,12 @@
 import os
 import uuid
 import base64
+import gc
 import requests
 from config import config
 
 def generate_imagen_look(gender: str = None, age: int = None, items_description: list[str] = None, occasion: str = "") -> str | None:
-    """Генерирует фото образа через Imagen 3 REST API (для обычных ключей AI Studio)."""
+    """Генерирует фото образа через Imagen 3 REST API с быстрой очисткой RAM."""
     if not config.gemini_api_key:
         print("GEMINI_API_KEY не установлен в переменных окружения.")
         return None
@@ -22,13 +23,10 @@ def generate_imagen_look(gender: str = None, age: int = None, items_description:
             f"Minimalist studio background, clean ambient lighting, highly detailed clothing fabric textures, realistic fit, high quality, 4k."
         )
 
-        # Прямой REST API эндпоинт Google AI Studio для Imagen 3
         url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key={config.gemini_api_key}"
         
         payload = {
-            "instances": [
-                {"prompt": prompt}
-            ],
+            "instances": [{"prompt": prompt}],
             "parameters": {
                 "sampleCount": 1,
                 "aspectRatio": "3:4",
@@ -36,7 +34,7 @@ def generate_imagen_look(gender: str = None, age: int = None, items_description:
             }
         }
 
-        response = requests.post(url, json=payload, timeout=30)
+        response = requests.post(url, json=payload, timeout=60)
         response.raise_for_status()
         data = response.json()
 
@@ -45,12 +43,16 @@ def generate_imagen_look(gender: str = None, age: int = None, items_description:
             print("Imagen API не вернул изображение:", data)
             return None
 
-        # Декодируем картинку из Base64
+        # Извлекаем Base64 и сразу освобождаем исходный JSON из RAM
         image_b64 = predictions[0].get("bytesBase64Encoded")
+        del data
+        del payload
+
         if not image_b64:
             return None
 
         image_bytes = base64.b64decode(image_b64)
+        del image_b64  # Освобождаем сырую строку Base64
 
         # Сохраняем в static/collages/
         os.makedirs(config.collages_dir, exist_ok=True)
@@ -60,8 +62,12 @@ def generate_imagen_look(gender: str = None, age: int = None, items_description:
         with open(file_path, "wb") as f:
             f.write(image_bytes)
 
+        del image_bytes
+        gc.collect()  # Принудительный сборщик мусора Python для высвобождения RAM
+
         return "/" + file_path.replace(os.sep, "/")
 
     except Exception as e:
         print(f"Ошибка при генерации изображения через Imagen 3 REST API: {e}")
+        gc.collect()
         return None
