@@ -141,12 +141,13 @@
     </div>
 </div>
 
-<!-- Скрипт инициализации Three.js и логики манекена -->
+<!-- Скрипт продвинутого 3D-манекена с текстурами и подгонкой формы под вещи (например, багги) -->
 <script>
     let scene, camera, renderer, mannequinParts = {};
     let isDragging = false;
     let previousMousePosition = { x: 0, y: 0 };
     let mannequinGroup;
+    const textureLoader = new THREE.TextureLoader();
 
     function init3DMannequin() {
         const container = document.getElementById('canvas-3d-container');
@@ -161,26 +162,26 @@
         renderer.setPixelRatio(window.devicePixelRatio);
         container.appendChild(renderer.domElement);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
         scene.add(ambientLight);
 
-        const pointLight = new THREE.PointLight(0xa855f7, 1.5, 50);
+        const pointLight = new THREE.PointLight(0xa855f7, 1.2, 50);
         pointLight.position.set(5, 5, 5);
         scene.add(pointLight);
 
         mannequinGroup = new THREE.Group();
         scene.add(mannequinGroup);
 
-        // Голова
-        const headGeo = new THREE.SphereGeometry(0.35, 32, 32);
-        const headMat = new THREE.MeshStandardMaterial({ color: 0x4c1d95, roughness: 0.4 });
+        // Голова манекена
+        const headGeo = new THREE.SphereGeometry(0.32, 32, 32);
+        const headMat = new THREE.MeshStandardMaterial({ color: 0x581c87, roughness: 0.3 });
         const head = new THREE.Mesh(headGeo, headMat);
-        head.position.set(0, 1.6, 0);
+        head.position.set(0, 1.65, 0);
         mannequinGroup.add(head);
 
-        // Верх (Торс)
-        const topGeo = new THREE.CylinderGeometry(0.45, 0.35, 1.1, 32);
-        const topMat = new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.3 });
+        // Торс (Верхняя одежда / Тренч / Лонгслив)
+        const topGeo = new THREE.CylinderGeometry(0.48, 0.38, 1.1, 32);
+        const topMat = new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.4 });
         const topMesh = new THREE.Mesh(topGeo, topMat);
         topMesh.position.set(0, 0.75, 0);
         mannequinGroup.add(topMesh);
@@ -189,18 +190,18 @@
         mannequinParts['outerwear'] = topMesh;
 
         // Низ (Брюки/Юбка)
-        const bottomGeo = new THREE.CylinderGeometry(0.33, 0.3, 1.0, 32);
+        const bottomGeo = new THREE.CylinderGeometry(0.36, 0.42, 1.05, 32);
         const bottomMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.5 });
         const bottomMesh = new THREE.Mesh(bottomGeo, bottomMat);
-        bottomMesh.position.set(0, -0.3, 0);
+        bottomMesh.position.set(0, -0.35, 0);
         mannequinGroup.add(bottomMesh);
         mannequinParts['bottom'] = bottomMesh;
 
         // Обувь
-        const shoesGeo = new THREE.BoxGeometry(0.7, 0.2, 0.4);
+        const shoesGeo = new THREE.BoxGeometry(0.75, 0.22, 0.45);
         const shoesMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.6 });
         const shoesMesh = new THREE.Mesh(shoesGeo, shoesMat);
-        shoesMesh.position.set(0, -0.9, 0);
+        shoesMesh.position.set(0, -0.95, 0);
         mannequinGroup.add(shoesMesh);
         mannequinParts['shoes'] = shoesMesh;
 
@@ -222,7 +223,7 @@
         function animate() {
             requestAnimationFrame(animate);
             if (!isDragging) {
-                mannequinGroup.rotation.y += 0.005; // Автоповорот
+                mannequinGroup.rotation.y += 0.004; // Плавное вращение
             }
             renderer.render(scene, camera);
         }
@@ -236,9 +237,54 @@
         });
     }
 
+    // Обновление текстуры или цвета манекена под выбранную вещь
+    function updateMannequinTextureOrColor(slotCategory, imageOrText) {
+        let targetPart = mannequinParts[slotCategory];
+        if (!targetPart && slotCategory === 'outerwear') targetPart = mannequinParts['top'];
+        
+        if (targetPart) {
+            // Если передана картинка (из гардероба)
+            if (imageOrText.startsWith('/') || imageOrText.startsWith('http')) {
+                textureLoader.load(imageOrText, (texture) => {
+                    targetPart.material.map = texture;
+                    targetPart.material.color.set(0xffffff);
+                    targetPart.material.needsUpdate = true;
+                }, undefined, () => {
+                    applyColorFallback(targetPart, imageOrText);
+                });
+            } else {
+                // Если передан текст (например, "Джинсы багги")
+                applyColorFallback(targetPart, imageOrText);
+                
+                // Корректировка геометрии под стиль (багги — делаем шире)
+                if (slotCategory === 'bottom') {
+                    if (imageOrText.toLowerCase().includes('багги') || imageOrText.toLowerCase().includes('широкие')) {
+                        targetPart.scale.set(1.4, 1.0, 1.4);
+                    } else {
+                        targetPart.scale.set(1.0, 1.0, 1.0);
+                    }
+                }
+            }
+        }
+    }
+
+    function applyColorFallback(mesh, seedString) {
+        let hash = 0;
+        for (let i = 0; i < seedString.length; i++) {
+            hash = seedString.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const color = new THREE.Color(`hsl(${Math.abs(hash) % 360}, 80%, 50%)`);
+        mesh.material.map = null;
+        mesh.material.color = color;
+        mesh.material.needsUpdate = true;
+    }
+
+    // Интерактив для обычного режима генерации
     function pickGenericOption(btn) {
         const slot = btn.dataset.slot;
-        document.querySelectorAll('.generic-opt-' + slot).forEach(function (el) {
+        const label = btn.dataset.label;
+
+        document.querySelectorAll('.generic-opt-' + slot).forEach(el => {
             el.classList.remove('bg-purple-600', 'text-white', 'border-purple-300');
             el.classList.add('bg-purple-950/60', 'text-purple-200');
         });
@@ -246,11 +292,18 @@
         btn.classList.add('bg-purple-600', 'text-white', 'border-purple-300');
 
         const previewEl = document.getElementById('preview-' + slot);
-        if (previewEl) previewEl.textContent = btn.dataset.label;
+        if (previewEl) previewEl.textContent = label;
 
-        updateMannequinColor(slot, btn.dataset.label);
+        const row = document.getElementById('row-' + slot);
+        if (row) {
+            row.classList.add('ring-2', 'ring-purple-400');
+            setTimeout(() => row.classList.remove('ring-2', 'ring-purple-400'), 450);
+        }
+
+        updateMannequinTextureOrColor(slot, label);
     }
 
+    // Интерактив для режима гардероба
     function updateWardrobePart(slotCategory, photoSrc, btn) {
         const boardImg = document.getElementById('board-' + slotCategory);
         if (boardImg) boardImg.src = photoSrc;
@@ -258,18 +311,7 @@
         document.querySelectorAll('.swap-' + slotCategory).forEach(el => el.classList.remove('ring-2', 'ring-purple-400'));
         btn.classList.add('ring-2', 'ring-purple-400');
 
-        updateMannequinColor(slotCategory, photoSrc);
-    }
-
-    function updateMannequinColor(slotCategory, seedString) {
-        if (mannequinParts[slotCategory]) {
-            let hash = 0;
-            for (let i = 0; i < seedString.length; i++) {
-                hash = seedString.charCodeAt(i) + ((hash << 5) - hash);
-            }
-            const color = new THREE.Color(`hsl(${Math.abs(hash) % 360}, 75%, 52%)`);
-            mannequinParts[slotCategory].material.color = color;
-        }
+        updateMannequinTextureOrColor(slotCategory, photoSrc);
     }
 
     document.addEventListener("DOMContentLoaded", init3DMannequin);
