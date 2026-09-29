@@ -20,6 +20,8 @@ class Config:
     openweather_api_key: str = os.getenv("OPENWEATHER_API_KEY", "")
     openweather_geocoding_url: str = "http://api.openweathermap.org/geo/1.0/direct"
     openweather_current_url: str = "https://api.openweathermap.org/data/2.5/weather"
+    supabase_url: str = os.getenv("SUPABASE_URL", "")
+    supabase_key: str = os.getenv("SUPABASE_KEY", "")
 
 
 config = Config()
