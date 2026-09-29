@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 
 # Импорт клиента Gemini для генерации картинок
 from google import genai
-from google.genai import types
+# types больше не нужен для конфига генерации картинок, используем словарь
 
 from config import config
 from database import init_db
@@ -83,11 +83,11 @@ def generate_imagen_look(items_list):
         result = client.models.generate_images(
             model='imagen-3.0-generate-002',
             prompt=prompt,
-            config=types.GenerateImageConfig(
-                number_of_images=1,
-                output_mime_type='jpeg',
-                aspect_ratio='3:4'
-            )
+            config={
+                'number_of_images': 1,
+                'output_mime_type': 'image/jpeg',
+                'aspect_ratio': '3:4'
+            }
         )
         
         os.makedirs('static/generated', exist_ok=True)
