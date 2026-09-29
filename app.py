@@ -2,7 +2,6 @@ import os
 import uuid
 import traceback
 from datetime import timedelta
-from services.look_generator import generate_imagen_look
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.utils import secure_filename
@@ -17,6 +16,7 @@ from repository import (
     save_profile,
 )
 from services.collage import build_collage
+from services.look_generator import generate_imagen_look
 from services.outfit_logic import build_outfit
 from services.weather import geocode_city, get_weather
 
@@ -167,9 +167,27 @@ def outfit_form():
             session_id = get_session_id()
             wardrobe_items = get_wardrobe(session_id)
             
-            # Генерация образа
+            # Генерация текста образа
             profile = get_profile(session_id)
             result = build_outfit(occasion, weather, wardrobe_items, profile)
+
+            # Собираем текстовые описания вещей для Imagen 3
+            items_desc = []
+            if result.mode == "wardrobe" and result.item_ids:
+                selected_items = [i for i in wardrobe_items if i["id"] in result.item_ids]
+                items_desc = [f"{i['category']}: {i.get('description') or ''}" for i in selected_items]
+            elif result.slots:
+                for slot in result.slots:
+                    if slot.get("options"):
+                        opt = slot["options"][0]
+                        opt_text = opt if isinstance(opt, str) else opt.get("description", "")
+                        items_desc.append(f"{slot['category']}: {opt_text}")
+
+            gender = profile.get("gender") if profile else None
+            age = profile.get("age") if profile else None
+
+            # Генерация фото-образа через Imagen 3
+            imagen_look_url = generate_imagen_look(gender, age, items_desc, occasion)
 
             collage_url = None
             collage_path = None
@@ -197,13 +215,13 @@ def outfit_form():
                 occasion=occasion,
                 explanation=result.explanation,
                 collage_url=collage_url,
+                imagen_look_url=imagen_look_url,
                 mode=result.mode,
                 slots=result.slots,
                 category_labels=CATEGORY_LABELS,
                 slot_icons=SLOT_ICONS,
             )
         except Exception as e:
-            # Вывод подробного текста ошибки на экран
             error_details = traceback.format_exc()
             return f"""
             <div style="padding: 30px; font-family: monospace; background: #ffe6e6; color: #990000; border: 2px solid #ff9999; margin: 40px; border-radius: 10px;">
