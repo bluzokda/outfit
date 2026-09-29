@@ -1,23 +1,20 @@
 import os
 import uuid
-from google import genai
+import base64
+import requests
 from config import config
 
 def generate_imagen_look(gender: str = None, age: int = None, items_description: list[str] = None, occasion: str = "") -> str | None:
-    """Генерирует фото образа в полный рост через Imagen 3 на основе выбранных вещей."""
+    """Генерирует фото образа через Imagen 3 REST API (для обычных ключей AI Studio)."""
     if not config.gemini_api_key:
-        print("ОБРАТИТЕ ВНИМАНИЕ: GEMINI_API_KEY не установлен.")
+        print("GEMINI_API_KEY не установлен в переменных окружения.")
         return None
 
     try:
-        client = genai.Client(api_key=config.gemini_api_key)
-
-        # Подготовка параметров для промпта
         clothes_str = ", ".join(items_description) if items_description else "stylish modern aesthetic streetwear outfit"
         gender_str = "male" if gender == "male" else ("female" if gender == "female" else "person")
         age_str = f"{age}-year-old" if age else "young adult"
 
-        # Детализированный промпт для фотосессии
         prompt = (
             f"Full-body aesthetic fashion editorial photograph of a {age_str} {gender_str} model. "
             f"Wearing: {clothes_str}. "
@@ -25,27 +22,46 @@ def generate_imagen_look(gender: str = None, age: int = None, items_description:
             f"Minimalist studio background, clean ambient lighting, highly detailed clothing fabric textures, realistic fit, high quality, 4k."
         )
 
-        # Вызов модели Imagen 3
-        result = client.models.generate_images(
-            model='imagen-3.0-generate-002',
-            prompt=prompt,
-            config=dict(
-                number_of_images=1,
-                aspect_ratio="3:4",  # Вертикальное соотношение для карточки
-                output_mime_type="image/jpeg",
-            )
-        )
+        # Прямой REST API эндпоинт Google AI Studio для Imagen 3
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key={config.gemini_api_key}"
+        
+        payload = {
+            "instances": [
+                {"prompt": prompt}
+            ],
+            "parameters": {
+                "sampleCount": 1,
+                "aspectRatio": "3:4",
+                "outputMimeType": "image/jpeg"
+            }
+        }
 
+        response = requests.post(url, json=payload, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+
+        predictions = data.get("predictions", [])
+        if not predictions:
+            print("Imagen API не вернул изображение:", data)
+            return None
+
+        # Декодируем картинку из Base64
+        image_b64 = predictions[0].get("bytesBase64Encoded")
+        if not image_b64:
+            return None
+
+        image_bytes = base64.b64decode(image_b64)
+
+        # Сохраняем в static/collages/
         os.makedirs(config.collages_dir, exist_ok=True)
-        for generated_image in result.generated_images:
-            filename = f"imagen_{uuid.uuid4().hex}.jpg"
-            file_path = os.path.join(config.collages_dir, filename)
+        filename = f"imagen_{uuid.uuid4().hex}.jpg"
+        file_path = os.path.join(config.collages_dir, filename)
 
-            with open(file_path, "wb") as f:
-                f.write(generated_image.image.image_bytes)
+        with open(file_path, "wb") as f:
+            f.write(image_bytes)
 
-            return "/" + file_path.replace(os.sep, "/")
+        return "/" + file_path.replace(os.sep, "/")
 
     except Exception as e:
-        print(f"Ошибка при генерации изображения через Imagen 3: {e}")
+        print(f"Ошибка при генерации изображения через Imagen 3 REST API: {e}")
         return None
