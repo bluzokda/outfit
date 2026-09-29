@@ -15,24 +15,44 @@
         {% endif %}
     </div>
 
-    <!-- Основной блок: Интерактивный лукбук (замена манекену) и совет стилиста -->
+    <!-- Основной блок: Визуальный лукбук и совет стилиста -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-        <!-- Блок визуального отображения собранного лука -->
-        <div class="relative w-full aspect-square rounded-2xl border border-purple-500/30 bg-purple-950/60 overflow-hidden shadow-inner flex flex-col items-center justify-center p-6">
-            <div id="activeLookDisplay" class="w-full h-full flex flex-col items-center justify-center gap-3 relative">
-                <!-- Сюда в реальном времени выводятся выбранные вещи -->
-                {% if mode == "wardrobe" and slots %}
-                    <img id="mainLookImage" src="/{{ slots[0].options[0].photo_path }}" alt="Образ" class="w-full h-full object-contain rounded-xl drop-shadow-2xl transition-all duration-300">
-                {% else %}
-                    <div class="w-20 h-20 rounded-2xl bg-purple-600/30 border border-purple-400/40 flex items-center justify-center text-4xl shadow-lg">
-                        ✨
-                    </div>
-                    <p class="text-sm font-bold text-purple-200 text-center px-4" id="mainLookText">
-                        {% if slots %}{{ slots[0].options[0] }}{% else %}Образ готов{% endif %}
-                    </p>
-                {%- endif %}
-            </div>
-            <div class="absolute bottom-3 px-3 py-1 rounded-full bg-purple-900/80 border border-purple-500/30 text-[10px] text-purple-300 tracking-wider uppercase pointer-events-none">
+        <!-- Блок живого превью образа -->
+        <div class="relative w-full aspect-square rounded-2xl border border-purple-500/30 bg-purple-950/60 overflow-hidden shadow-inner flex flex-col items-center justify-center p-4">
+            
+            {% if mode == "wardrobe" %}
+                <!-- Сетка реальных фото вещей из гардероба -->
+                <div id="liveLookCanvas" class="w-full h-full grid grid-cols-2 gap-3 items-center justify-center p-2">
+                    {% for slot in slots %}
+                        <div class="relative w-full aspect-square rounded-xl overflow-hidden border border-purple-500/30 bg-purple-900/40 shadow-md flex items-center justify-center">
+                            <img id="preview-img-{{ slot.category }}"
+                                 src="/{{ slot.options[0].photo_path }}"
+                                 alt="{{ category_labels.get(slot.category, slot.category) }}"
+                                 class="w-full h-full object-cover">
+                            <span class="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-[9px] text-purple-200 uppercase tracking-wider">
+                                {{ category_labels.get(slot.category, slot.category) }}
+                            </span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <!-- Красивые карточки для текстового режима -->
+                <div id="liveLookCanvasText" class="w-full h-full flex flex-col justify-center gap-2.5 p-3 overflow-y-auto">
+                    {% for slot in slots %}
+                        <div class="flex items-center gap-3 p-3 rounded-xl bg-purple-900/40 border border-purple-500/30 shadow">
+                            <div class="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0 bg-purple-600/40">
+                                {{ slot_icons.get(slot.category, '') }}
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-[9px] uppercase tracking-wider text-purple-400/70">{{ category_labels.get(slot.category, slot.category) }}</p>
+                                <p id="canvas-text-{{ slot.category }}" class="text-xs font-bold text-white truncate">{{ slot.options[0] }}</p>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="absolute bottom-3 px-3 py-1 rounded-full bg-purple-900/80 border border-purple-500/30 text-[10px] text-purple-300 tracking-wider uppercase pointer-events-none z-10">
                 Интерактивный лук
             </div>
         </div>
@@ -54,35 +74,25 @@
     <div>
         <h3 class="text-xs font-bold uppercase tracking-wider text-purple-400 mb-3 flex items-center gap-2">
             <span>🪄</span> Конструктор образа
-            <span class="normal-case font-normal text-purple-400/60">— нажимай на вещи, чтобы изменить лук</span>
+            <span class="normal-case font-normal text-purple-400/60">— нажимай на вещи ниже, чтобы обновить лук</span>
         </h3>
 
         {% if mode == "wardrobe" %}
             <!-- Режим гардероба -->
             <div class="rounded-2xl border border-purple-500/30 bg-purple-950/50 p-5 shadow-inner">
-                <div id="flatlayBoard" class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-                    {% for slot in slots %}
-                        <div class="flex flex-col items-center">
-                            <div class="w-full aspect-square rounded-2xl overflow-hidden border border-purple-500/30 bg-purple-900/40 shadow-lg cursor-pointer hover:border-purple-400 transition">
-                                <img id="board-{{ slot.category }}"
-                                     src="/{{ slot.options[0].photo_path }}"
-                                     alt="{{ category_labels.get(slot.category, slot.category) }}"
-                                     class="w-full h-full object-cover transition duration-300">
-                            </div>
-                            <span class="mt-2 text-[10px] uppercase tracking-wider text-purple-400/70">{{ slot_icons.get(slot.category, '') }} {{ category_labels.get(slot.category, slot.category) }}</span>
-                        </div>
-                    {% endfor %}
+                <div id="flatlayBoard" class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6 hidden">
+                    <!-- Скрытый блок старой доски, так как теперь превью прямо вверху -->
                 </div>
 
                 {% for slot in slots %}
-                    {% if slot.options|length > 1 %}
+                    {% if slot.options|length > 0 %}
                         <div class="mb-4 last:mb-0">
-                            <p class="text-[11px] text-purple-400/70 mb-2">{{ slot_icons.get(slot.category, '') }} {{ category_labels.get(slot.category, slot.category) }} — варианты из гардероба</p>
+                            <p class="text-[11px] text-purple-400/70 mb-2">{{ slot_icons.get(slot.category, '') }} {{ category_labels.get(slot.category, slot.category) }}</p>
                             <div class="flex gap-2.5 overflow-x-auto pb-1">
                                 {% for opt in slot.options %}
                                     <button type="button"
                                         onclick="updateWardrobePart('{{ slot.category }}', '/{{ opt.photo_path }}', this)"
-                                        class="swap-{{ slot.category }} shrink-0 w-16 h-16 rounded-xl overflow-hidden border border-purple-500/30 {% if opt.recommended %}ring-2 ring-purple-400{% endif %} transition hover:border-purple-400"
+                                        class="swap-{{ slot.category }} shrink-0 w-16 h-16 rounded-xl overflow-hidden border border-purple-500/30 {% if loop.first %}ring-2 ring-purple-400{% endif %} transition hover:border-purple-400"
                                         title="{{ opt.description }}">
                                         <img src="/{{ opt.photo_path }}" alt="" class="w-full h-full object-cover">
                                     </button>
@@ -105,19 +115,7 @@
         {% else %}
             <!-- Общий режим (текстовые карточки) -->
             <div class="rounded-2xl border border-purple-500/30 bg-purple-950/50 p-6 shadow-inner">
-                <div id="lookPreview" class="flex flex-col gap-3 mb-7">
-                    {% for slot in slots %}
-                        <div id="row-{{ slot.category }}" class="flex items-center gap-4 p-3.5 rounded-2xl bg-purple-900/50 border border-purple-500/20 transition">
-                            <div class="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 bg-gradient-to-br from-purple-600/40 to-indigo-600/40">
-                                {{ slot_icons.get(slot.category, '') }}
-                            </div>
-                            <div class="min-w-0">
-                                <p class="text-[10px] uppercase tracking-wider text-purple-400/70">{{ category_labels.get(slot.category, slot.category) }}</p>
-                                <p id="preview-{{ slot.category }}" class="text-sm font-semibold text-white truncate">{{ slot.options[0] }}</p>
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
+                <div id="lookPreview" class="flex flex-col gap-3 mb-7 hidden"></div>
 
                 {% for slot in slots %}
                     <div class="mb-5 last:mb-0">
@@ -150,7 +148,7 @@
     </div>
 </div>
 
-<!-- Скрипт управления интерактивным луком -->
+<!-- Скрипт мгновенного обновления превью образа -->
 <script>
     function pickGenericOption(btn) {
         const slot = btn.dataset.slot;
@@ -163,27 +161,21 @@
         btn.classList.remove('bg-purple-950/60', 'text-purple-200');
         btn.classList.add('bg-purple-600', 'text-white', 'border-purple-300');
 
-        const previewEl = document.getElementById('preview-' + slot);
-        if (previewEl) previewEl.textContent = label;
-
-        // Обновляем главный текст-описатель лука сверху
-        const mainText = document.getElementById('mainLookText');
-        if (mainText) {
-            mainText.textContent = label;
+        // Обновляем текст внутри левого блока-визуализации
+        const canvasTextEl = document.getElementById('canvas-text-' + slot);
+        if (canvasTextEl) {
+            canvasTextEl.textContent = label;
         }
     }
 
     function updateWardrobePart(slotCategory, photoSrc, btn) {
-        const boardImg = document.getElementById('board-' + slotCategory);
-        if (boardImg) boardImg.src = photoSrc;
-
         document.querySelectorAll('.swap-' + slotCategory).forEach(el => el.classList.remove('ring-2', 'ring-purple-400'));
         btn.classList.add('ring-2', 'ring-purple-400');
 
-        // Выводим выбранную вещь на главный большой экран превью образа
-        const mainLookImage = document.getElementById('mainLookImage');
-        if (mainLookImage) {
-            mainLookImage.src = photoSrc;
+        // Мгновенно меняем картинку конкретной вещи в левом общем превью образа
+        const previewImg = document.getElementById('preview-img-' + slotCategory);
+        if (previewImg) {
+            previewImg.src = photoSrc;
         }
     }
 </script>
