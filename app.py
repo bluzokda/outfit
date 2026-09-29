@@ -3,7 +3,7 @@ import uuid
 import traceback
 from datetime import timedelta
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, redirect, render_template, request, session, url_for, jsonify
 from werkzeug.utils import secure_filename
 
 from config import config
@@ -167,11 +167,10 @@ def outfit_form():
             session_id = get_session_id()
             wardrobe_items = get_wardrobe(session_id)
             
-            # Генерация текста образа
             profile = get_profile(session_id)
             result = build_outfit(occasion, weather, wardrobe_items, profile)
 
-            # Собираем текстовые описания вещей для Imagen 3
+            # Собираем текстовые описания выбранных вещей для Imagen 3
             items_desc = []
             if result.mode == "wardrobe" and result.item_ids:
                 selected_items = [i for i in wardrobe_items if i["id"] in result.item_ids]
@@ -186,7 +185,7 @@ def outfit_form():
             gender = profile.get("gender") if profile else None
             age = profile.get("age") if profile else None
 
-            # Генерация фото-образа через Imagen 3
+            # Первичная генерация фото образа
             imagen_look_url = generate_imagen_look(gender, age, items_desc, occasion)
 
             collage_url = None
@@ -215,7 +214,7 @@ def outfit_form():
                 occasion=occasion,
                 explanation=result.explanation,
                 collage_url=collage_url,
-                imagen_look_url=imagen_look_url,
+                initial_image_url=imagen_look_url,  # Передаем в шаблон под именование initial_image_url
                 mode=result.mode,
                 slots=result.slots,
                 category_labels=CATEGORY_LABELS,
@@ -231,6 +230,34 @@ def outfit_form():
             """, 500
 
     return render_template("outfit_form.html")
+
+
+# ==========================================
+# API ДЛЯ ПЕРЕГЕНЕРАЦИИ КАРТИНКИ ИЗ КОНСТРУКТОРА
+# ==========================================
+@app.route("/api/generate-look", methods=["POST"])
+def api_generate_look():
+    try:
+        data = request.get_json() or {}
+        selected_items = data.get("items", [])
+
+        session_id = get_session_id()
+        profile = get_profile(session_id) or {}
+
+        gender = profile.get("gender")
+        age = profile.get("age")
+
+        # Генерируем новое изображение под выбранный набор вещей
+        image_url = generate_imagen_look(gender, age, selected_items)
+
+        if image_url:
+            return jsonify({"success": True, "image_url": image_url})
+        else:
+            return jsonify({"success": False, "error": "Не удалось сгенерировать изображение"}), 500
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=False)
