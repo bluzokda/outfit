@@ -66,7 +66,7 @@ def get_session_id() -> str:
     return session["session_id"]
 
 def generate_imagen_look(items_list):
-    """Генерация картинки лука через универсальный метод generate_content"""
+    """Генерация картинки лука через актуальную модель Gemini"""
     if not items_list:
         return None
     
@@ -79,9 +79,9 @@ def generate_imagen_look(items_list):
     
     try:
         client = genai.Client()
-        # Используем современный метод generate_content с моделью Gemini, которая умеет создавать изображения
+        # Используем модель, указанную в сообщении об ошибке Google
         response = client.models.generate_content(
-            model='gemini-2.5-flash', # или gemini-2.5-pro, поддерживающие генерацию картинок
+            model='gemini-3.8-flash',
             contents=prompt,
             config={
                 'response_modalities': ['IMAGE', 'TEXT']
@@ -92,13 +92,14 @@ def generate_imagen_look(items_list):
         filename = f"outfit_{uuid.uuid4().hex[:8]}.jpg"
         filepath = os.path.join('static/generated', filename)
         
-        # Ищем сгенерированное изображение в частях ответа
-        for part in response.candidates[0].content.parts:
-            if part.inline_data:
-                image_bytes = part.inline_data.data
-                with open(filepath, 'wb') as f:
-                    f.write(image_bytes)
-                return f"/{filepath}"
+        # Проверяем наличие частей ответа с изображением
+        if response.candidates and response.candidates[0].content.parts:
+            for part in response.candidates[0].content.parts:
+                if hasattr(part, 'inline_data') and part.inline_data:
+                    image_bytes = part.inline_data.data
+                    with open(filepath, 'wb') as f:
+                        f.write(image_bytes)
+                    return f"/{filepath}"
                 
         return None
     except Exception as e:
