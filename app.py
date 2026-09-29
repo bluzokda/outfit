@@ -1,12 +1,13 @@
 import os
 import uuid
 import traceback
-import urllib.parse
 from datetime import timedelta
 
-import requests
 from flask import Flask, redirect, render_template, request, session, url_for, jsonify
 from werkzeug.utils import secure_filename
+
+# Официальный SDK Google GenAI
+from google import genai
 
 from config import config
 from database import init_db
@@ -66,38 +67,45 @@ def get_session_id() -> str:
 
 
 def generate_imagen_look(items_list):
-    """Формирует прямую URL-ссылку для Pollinations.ai.
-    Загрузка происходит напрямую в браузере пользователя,
-    что обходит блокировки IP-адресов Render (402/500).
-    """
+    """Безопасная функция генерации: при исчерпании квот возвращает None, не ломая сайт."""
     if not items_list:
         return None
 
     items_description = ", ".join(items_list)
     prompt = (
-        f"professional fashion studio lookbook photography image, "
-        f"stylish full-body outfit on a model consisting of {items_description}, "
-        f"clean minimalist background, high-end fashion magazine style, high resolution"
+        f"Generate a professional fashion studio lookbook photography image. "
+        f"A stylish full-body outfit on a model consisting of: {items_description}. "
+        f"Clean minimalist background, high-end fashion magazine style, high resolution."
     )
 
     try:
-        encoded_prompt = urllib.parse.quote(prompt)
-        seed = uuid.uuid4().int % 100000
-        
-        # Возвращаем прямую ссылку для тега <img> в браузере
-        return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=1024&seed={seed}&model=flux"
-    except Exception as e:
-        print(f"Ошибка формирования ссылки генерации: {e}")
-        return None
+        client = genai.Client()
+        response = client.models.generate_content(
+            model="gemini-3.1-flash-image",
+            contents=prompt,
+            config={"response_modalities": ["IMAGE"]},
+        )
 
+        os.makedirs("static/generated", exist_ok=True)
+        filename = f"outfit_{uuid.uuid4().hex[:8]}.jpg"
+        filepath = os.path.join("static/generated", filename)
+
+        if response.candidates and response.candidates[0].content.parts:
+            for part in response.candidates[0].content.parts:
+                if hasattr(part, "inline_data") and part.inline_data:
+                    image_bytes = part.inline_data.data
+                    with open(filepath, "wb") as f:
+                        f.write(image_bytes)
+                    return f"/{filepath}"
+
+        return None
     except Exception as e:
-        print(f"Ошибка генерации картинки через Pollinations.ai: {e}")
+        print(f"Генерация картинки пропущена из-за ограничений API/квот: {e}")
         return None
 
 
 @app.context_processor
 def inject_profile_flag():
-    """Флаг для шаблонов: заполнен ли профиль (чтобы показать подсказку)."""
     sid = session.get("session_id")
     profile = get_profile(sid) if sid else None
     return {"has_profile": bool(profile and (profile.get("gender") or profile.get("age")))}
@@ -185,7 +193,7 @@ def settings():
 
 @app.route("/api/generate-look", methods=["POST"])
 def api_generate_look():
-    """Эндпоинт для JS-асинхронного обновления картинки при клике на вещи"""
+    """Возвращает статус 200 с флагом успеха/неудачи вместо вызова 500 ошибки."""
     data = request.get_json() or {}
     selected_items = data.get("items", [])
 
@@ -195,7 +203,7 @@ def api_generate_look():
 
     return jsonify({
         "success": False,
-        "error": "Не удалось сгенерировать изображение, используется стандартный коллаж"
+        "error": "Генерация нейросетью временно недоступна, используется коллаж",
     })
 
 
@@ -240,6 +248,7 @@ def outfit_form():
                         else:
                             initial_items_desc.append(str(opt))
 
+            # При невозможности сгенерировать картинку подставляется пустая строка, избегая вызова /None
             initial_image_url = generate_imagen_look(initial_items_desc) or ""
 
             collage_url = None
