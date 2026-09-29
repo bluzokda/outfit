@@ -66,7 +66,7 @@ def get_session_id() -> str:
     return session["session_id"]
 
 def generate_imagen_look(items_list):
-    """Генерация картинки лука через модель Gemini с поддержкой изображений"""
+    """Безопасная функция генерации картинки: если квота исчерпана, просто возвращаем None"""
     if not items_list:
         return None
     
@@ -79,7 +79,6 @@ def generate_imagen_look(items_list):
     
     try:
         client = genai.Client()
-        # Используем актуальную модель для генерации изображений
         response = client.models.generate_content(
             model='gemini-3.1-flash-image',
             contents=prompt,
@@ -102,7 +101,8 @@ def generate_imagen_look(items_list):
                 
         return None
     except Exception as e:
-        print(f"Ошибка генерации картинки через Gemini: {e}")
+        # Логируем ошибку, но не роняем приложение — пользователь получит коллаж из одежды
+        print(f"Генерация картинки пропущена из-за ограничений API/квот: {e}")
         return None
 
 @app.context_processor
