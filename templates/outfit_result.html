@@ -77,15 +77,20 @@
             {% endif %}
 
         {% else %}
-            <!-- Манекен: гардероба нет, показываем силуэты категорий с вариантами названий -->
+            <!-- Живое превью: карточки по категориям, обновляются мгновенно при клике -->
             <div class="rounded-2xl border border-purple-500/30 bg-purple-950/50 p-6 shadow-inner">
-                <div class="flex flex-col items-center mb-6">
-                    <svg width="120" height="220" viewBox="0 0 120 220" class="mb-2 opacity-80">
-                        <circle cx="60" cy="28" r="22" fill="rgba(168,85,247,0.35)" stroke="rgba(168,85,247,0.6)" stroke-width="2"/>
-                        <path d="M30 60 Q60 45 90 60 L96 150 Q60 168 24 150 Z" fill="rgba(99,102,241,0.28)" stroke="rgba(168,85,247,0.5)" stroke-width="2"/>
-                        <path d="M28 150 L22 210 M92 150 L98 210" stroke="rgba(168,85,247,0.5)" stroke-width="10" stroke-linecap="round" fill="none"/>
-                    </svg>
-                    <p id="outfitSummary" class="text-center text-sm text-purple-200 font-medium max-w-xs"></p>
+                <div id="lookPreview" class="flex flex-col gap-3 mb-7">
+                    {% for slot in slots %}
+                        <div id="row-{{ slot.category }}" class="flex items-center gap-4 p-3.5 rounded-2xl bg-purple-900/50 border border-purple-500/20 transition">
+                            <div class="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 bg-gradient-to-br from-purple-600/40 to-indigo-600/40">
+                                {{ slot_icons.get(slot.category, '') }}
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-[10px] uppercase tracking-wider text-purple-400/70">{{ category_labels.get(slot.category, slot.category) }}</p>
+                                <p id="preview-{{ slot.category }}" class="text-sm font-semibold text-white truncate">{{ slot.options[0] }}</p>
+                            </div>
+                        </div>
+                    {% endfor %}
                 </div>
 
                 {% for slot in slots %}
@@ -95,7 +100,7 @@
                             {% for opt in slot.options %}
                                 <button type="button"
                                     data-slot="{{ slot.category }}"
-                                    data-label="{{ slot_icons.get(slot.category, '') }} {{ opt }}"
+                                    data-label="{{ opt }}"
                                     onclick="pickGenericOption(this)"
                                     class="generic-opt generic-opt-{{ slot.category }} px-4 py-2 rounded-full bg-purple-950/60 border border-purple-500/30 text-purple-200 text-xs font-medium transition hover:border-purple-400 {% if loop.first %}bg-purple-600 text-white border-purple-300{% endif %}">
                                     {{ opt }}
@@ -109,29 +114,23 @@
             <script>
                 function pickGenericOption(btn) {
                     const slot = btn.dataset.slot;
-                    document.querySelectorAll('.generic-opt-' + slot).forEach(el => {
+                    document.querySelectorAll('.generic-opt-' + slot).forEach(function (el) {
                         el.classList.remove('bg-purple-600', 'text-white', 'border-purple-300');
                         el.classList.add('bg-purple-950/60', 'text-purple-200');
                     });
                     btn.classList.remove('bg-purple-950/60', 'text-purple-200');
                     btn.classList.add('bg-purple-600', 'text-white', 'border-purple-300');
-                    updateOutfitSummary();
-                }
 
-                function updateOutfitSummary() {
-                    const parts = [];
-                    document.querySelectorAll('[data-slot]').forEach(function () {});
-                    const slots = {};
-                    document.querySelectorAll('.generic-opt').forEach(function (btn) {
-                        if (btn.classList.contains('bg-purple-600')) {
-                            slots[btn.dataset.slot] = btn.dataset.label;
-                        }
-                    });
-                    Object.values(slots).forEach(v => parts.push(v));
-                    const el = document.getElementById('outfitSummary');
-                    if (el) el.textContent = parts.join('  +  ');
+                    const previewEl = document.getElementById('preview-' + slot);
+                    if (previewEl) {
+                        previewEl.textContent = btn.dataset.label;
+                    }
+                    const row = document.getElementById('row-' + slot);
+                    if (row) {
+                        row.classList.add('ring-2', 'ring-purple-400');
+                        setTimeout(function () { row.classList.remove('ring-2', 'ring-purple-400'); }, 450);
+                    }
                 }
-                document.addEventListener('DOMContentLoaded', updateOutfitSummary);
             </script>
         {% endif %}
     </div>
