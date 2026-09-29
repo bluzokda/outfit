@@ -66,27 +66,25 @@ def get_session_id() -> str:
     return session["session_id"]
 
 def generate_imagen_look(items_list):
-    """Вспомогательная функция для генерации картинки лука через Gemini Imagen API"""
+    """Генерация картинки лука через универсальный метод generate_content"""
     if not items_list:
         return None
     
     items_description = ", ".join(items_list)
     prompt = (
-        f"A professional fashion studio lookbook photography. "
+        f"Generate a professional fashion studio lookbook photography image. "
         f"A stylish full-body outfit on a model consisting of: {items_description}. "
-        f"Clean minimalist background, high-end fashion magazine style, high resolution, 4k."
+        f"Clean minimalist background, high-end fashion magazine style, high resolution."
     )
     
     try:
-        # Клиент берет GEMINI_API_KEY из переменных окружения
         client = genai.Client()
-        result = client.models.generate_images(
-            model='imagen-3.0-generate-002',
-            prompt=prompt,
+        # Используем современный метод generate_content с моделью Gemini, которая умеет создавать изображения
+        response = client.models.generate_content(
+            model='gemini-2.5-flash', # или gemini-2.5-pro, поддерживающие генерацию картинок
+            contents=prompt,
             config={
-                'number_of_images': 1,
-                'output_mime_type': 'image/jpeg',
-                'aspect_ratio': '3:4'
+                'response_modalities': ['IMAGE', 'TEXT']
             }
         )
         
@@ -94,10 +92,17 @@ def generate_imagen_look(items_list):
         filename = f"outfit_{uuid.uuid4().hex[:8]}.jpg"
         filepath = os.path.join('static/generated', filename)
         
-        result.generated_images[0].image.save(filepath)
-        return f"/{filepath}"
+        # Ищем сгенерированное изображение в частях ответа
+        for part in response.candidates[0].content.parts:
+            if part.inline_data:
+                image_bytes = part.inline_data.data
+                with open(filepath, 'wb') as f:
+                    f.write(image_bytes)
+                return f"/{filepath}"
+                
+        return None
     except Exception as e:
-        print(f"Ошибка генерации картинки через Imagen: {e}")
+        print(f"Ошибка генерации картинки через Gemini: {e}")
         return None
 
 @app.context_processor
