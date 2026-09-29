@@ -35,8 +35,7 @@ def clean_and_translate_prompt(items_description: list[str]) -> str:
     return result if result else "stylish modern casual streetwear outfit"
 
 def generate_imagen_look(gender: str = None, age: int = None, items_description: list[str] = None, occasion: str = "") -> str | None:
-    """Генерирует фото образа через Hugging Face Inference API (модель FLUX.1-dev)."""
-    # Если токен HF не задан в переменных Render, берем дефолтный резервный ключ
+    """Генерирует фото образа через актуальный Hugging Face Router API."""
     hf_token = os.getenv("HF_TOKEN") or getattr(config, "hf_token", None)
     
     if not hf_token:
@@ -53,13 +52,22 @@ def generate_imagen_look(gender: str = None, age: int = None, items_description:
             f"Minimalist photo studio background, highly detailed fabric texture, realistic lighting, 4k"
         )
 
-        # Стабильная и качественная модель FLUX.1-dev
-        api_url = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev"
-        headers = {"Authorization": f"Bearer {hf_token}"}
+        headers = {
+            "Authorization": f"Bearer {hf_token}",
+            "Content-Type": "application/json"
+        }
         payload = {"inputs": prompt}
 
-        response = requests.post(api_url, headers=headers, json=payload, timeout=50)
-        
+        # Рабочий URL роутера Hugging Face
+        api_url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-dev"
+
+        response = requests.post(api_url, headers=headers, json=payload, timeout=60)
+
+        # Если первая модель недоступна, пробуем быстрый фоллбэк на FLUX.1-schnell
+        if response.status_code in (503, 404, 500):
+            fallback_url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
+            response = requests.post(fallback_url, headers=headers, json=payload, timeout=60)
+
         if not response.ok:
             print(f"Ошибка Hugging Face API ({response.status_code}): {response.text}")
             response.raise_for_status()
