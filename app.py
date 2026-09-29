@@ -3,8 +3,12 @@ import uuid
 import traceback
 from datetime import timedelta
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, redirect, render_template, request, session, url_for, jsonify
 from werkzeug.utils import secure_filename
+
+# Импорт клиента Gemini для генерации картинок
+from google import genai
+from google.genai import types
 
 from config import config
 from database import init_db
@@ -60,6 +64,41 @@ def get_session_id() -> str:
         session["session_id"] = uuid.uuid4().hex
     session.permanent = True
     return session["session_id"]
+
+def generate_imagen_look(items_list):
+    """Вспомогательная функция для генерации картинки лука через Gemini Imagen API"""
+    if not items_list:
+        return None
+    
+    items_description = ", ".join(items_list)
+    prompt = (
+        f"A professional fashion studio lookbook photography. "
+        f"A stylish full-body outfit on a model consisting of: {items_description}. "
+        f"Clean minimalist background, high-end fashion magazine style, high resolution, 4k."
+    )
+    
+    try:
+        # Клиент берет GEMINI_API_KEY из переменных окружения
+        client = genai.Client()
+        result = client.models.generate_images(
+            model='imagen-3.0-generate-002',
+            prompt=prompt,
+            config=types.GenerateImageConfig(
+                number_of_images=1,
+                output_mime_type='jpeg',
+                aspect_ratio='3:4'
+            )
+        )
+        
+        os.makedirs('static/generated', exist_ok=True)
+        filename = f"outfit_{uuid.uuid4().hex[:8]}.jpg"
+        filepath = os.path.join('static/generated', filename)
+        
+        result.generated_images[0].image.save(filepath)
+        return f"/{filepath}"
+    except Exception as e:
+        print(f"Ошибка генерации картинки через Imagen: {e}")
+        return None
 
 @app.context_processor
 def inject_profile_flag():
@@ -143,6 +182,17 @@ def settings():
         saved=request.args.get("saved"),
     )
 
+@app.route("/api/generate-look", methods=["POST"])
+def api_generate_look():
+    """Эндпоинт для JS-асинхронного обновления картинки при клике на вещи"""
+    data = request.get_json() or {}
+    selected_items = data.get("items", [])
+    
+    image_url = generate_imagen_look(selected_items)
+    if image_url:
+        return jsonify({"success": True, "image_url": image_url})
+    return jsonify({"success": False, "error": "Не удалось сгенерировать изображение"}), 500
+
 @app.route("/outfit", methods=["GET", "POST"])
 def outfit_form():
     if request.method == "POST":
@@ -173,6 +223,20 @@ def outfit_form():
             profile = get_profile(session_id)
             result = build_outfit(occasion, weather, wardrobe_items, profile)
 
+            # Собираем начальный список названий вещей для генерации первой картинки
+            initial_items_desc = []
+            if result.slots:
+                for slot in result.slots:
+                    if slot.get("options"):
+                        opt = slot["options"][0]
+                        if isinstance(opt, dict):
+                            initial_items_desc.append(opt.get("description", CATEGORY_LABELS.get(slot["category"], slot["category"])))
+                        else:
+                            initial_items_desc.append(str(opt))
+
+            # Генерируем первую картинку через Imagen
+            initial_image_url = generate_imagen_look(initial_items_desc)
+
             collage_url = None
             collage_path = None
             if result.item_ids:
@@ -199,13 +263,13 @@ def outfit_form():
                 occasion=occasion,
                 explanation=result.explanation,
                 collage_url=collage_url,
+                initial_image_url=initial_image_url,
                 mode=result.mode,
                 slots=result.slots,
                 category_labels=CATEGORY_LABELS,
                 slot_icons=SLOT_ICONS,
             )
         except Exception as e:
-            # Вывод подробного текста ошибки на экран
             error_details = traceback.format_exc()
             return f"""
             <div style="padding: 30px; font-family: monospace; background: #ffe6e6; color: #990000; border: 2px solid #ff9999; margin: 40px; border-radius: 10px;">
