@@ -6,7 +6,7 @@ import requests
 from config import config
 
 def generate_imagen_look(gender: str = None, age: int = None, items_description: list[str] = None, occasion: str = "") -> str | None:
-    """Генерирует фото образа через Imagen 3 REST API с быстрой очисткой RAM."""
+    """Генерирует фото образа через Imagen 3 REST API (генерация через :generateImages)."""
     if not config.gemini_api_key:
         print("GEMINI_API_KEY не установлен в переменных окружения.")
         return None
@@ -23,12 +23,13 @@ def generate_imagen_look(gender: str = None, age: int = None, items_description:
             f"Minimalist studio background, clean ambient lighting, highly detailed clothing fabric textures, realistic fit, high quality, 4k."
         )
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key={config.gemini_api_key}"
+        # Актуальный REST URL для генерации изображений через AI Studio
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:generateImages?key={config.gemini_api_key}"
         
         payload = {
-            "instances": [{"prompt": prompt}],
-            "parameters": {
-                "sampleCount": 1,
+            "prompt": prompt,
+            "config": {
+                "numberOfImages": 1,
                 "aspectRatio": "3:4",
                 "outputMimeType": "image/jpeg"
             }
@@ -38,13 +39,14 @@ def generate_imagen_look(gender: str = None, age: int = None, items_description:
         response.raise_for_status()
         data = response.json()
 
-        predictions = data.get("predictions", [])
-        if not predictions:
+        # Извлекаем сгенерированные изображения
+        generated_images = data.get("generatedImages", [])
+        if not generated_images:
             print("Imagen API не вернул изображение:", data)
             return None
 
-        # Извлекаем Base64 и сразу освобождаем исходный JSON из RAM
-        image_b64 = predictions[0].get("bytesBase64Encoded")
+        # Считываем Base64 из структуры ответа
+        image_b64 = generated_images[0].get("image", {}).get("imageBytes")
         del data
         del payload
 
@@ -52,7 +54,7 @@ def generate_imagen_look(gender: str = None, age: int = None, items_description:
             return None
 
         image_bytes = base64.b64decode(image_b64)
-        del image_b64  # Освобождаем сырую строку Base64
+        del image_b64
 
         # Сохраняем в static/collages/
         os.makedirs(config.collages_dir, exist_ok=True)
@@ -63,7 +65,7 @@ def generate_imagen_look(gender: str = None, age: int = None, items_description:
             f.write(image_bytes)
 
         del image_bytes
-        gc.collect()  # Принудительный сборщик мусора Python для высвобождения RAM
+        gc.collect()
 
         return "/" + file_path.replace(os.sep, "/")
 
