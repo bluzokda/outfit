@@ -3,7 +3,7 @@
 <div class="max-w-4xl mx-auto glass-panel rounded-3xl p-6 sm:p-10 border border-purple-500/30 shadow-2xl space-y-8 animate-fade-in">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-6 border-b border-purple-900/40 gap-4">
         <div>
-            <h1 class="text-3xl font-black text-white mb-1">Визуализация твоего образа</h1>
+            <h1 class="text-3xl font-black text-white mb-1">AI Генератор Лукбука</h1>
             <p class="text-sm text-purple-300/70">Повод: <span class="text-purple-200 font-semibold">{{ occasion }}</span></p>
         </div>
         {% if weather %}
@@ -15,45 +15,24 @@
         {% endif %}
     </div>
 
-    <!-- Основной блок: Визуальный лукбук и совет стилиста -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-        <!-- Блок живого превью образа -->
-        <div class="relative w-full aspect-square rounded-2xl border border-purple-500/30 bg-purple-950/60 overflow-hidden shadow-inner flex flex-col items-center justify-center p-4">
-            
-            {% if mode == "wardrobe" %}
-                <!-- Сетка реальных фото вещей из гардероба -->
-                <div id="liveLookCanvas" class="w-full h-full grid grid-cols-2 gap-3 items-center justify-center p-2">
-                    {% for slot in slots %}
-                        <div class="relative w-full aspect-square rounded-xl overflow-hidden border border-purple-500/30 bg-purple-900/40 shadow-md flex items-center justify-center">
-                            <img id="preview-img-{{ slot.category }}"
-                                 src="/{{ slot.options[0].photo_path }}"
-                                 alt="{{ category_labels.get(slot.category, slot.category) }}"
-                                 class="w-full h-full object-cover">
-                            <span class="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-[9px] text-purple-200 uppercase tracking-wider">
-                                {{ category_labels.get(slot.category, slot.category) }}
-                            </span>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <!-- Красивые карточки для текстового режима -->
-                <div id="liveLookCanvasText" class="w-full h-full flex flex-col justify-center gap-2.5 p-3 overflow-y-auto">
-                    {% for slot in slots %}
-                        <div class="flex items-center gap-3 p-3 rounded-xl bg-purple-900/40 border border-purple-500/30 shadow">
-                            <div class="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0 bg-purple-600/40">
-                                {{ slot_icons.get(slot.category, '') }}
-                            </div>
-                            <div class="min-w-0">
-                                <p class="text-[9px] uppercase tracking-wider text-purple-400/70">{{ category_labels.get(slot.category, slot.category) }}</p>
-                                <p id="canvas-text-{{ slot.category }}" class="text-xs font-bold text-white truncate">{{ slot.options[0] }}</p>
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
-            {% endif %}
+    <!-- Основной блок: Сгенерированное изображение слева, совет стилиста справа -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+        <!-- Блок вывода сгенерированной картинки лука -->
+        <div class="relative w-full aspect-[3/4] rounded-2xl border border-purple-500/30 bg-purple-950/60 overflow-hidden shadow-inner flex flex-col items-center justify-center p-2">
+            <!-- Лоадер при генерации -->
+            <div id="loader" class="absolute inset-0 bg-purple-950/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3 z-20 hidden">
+                <div class="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                <p class="text-xs text-purple-200 font-medium tracking-wide">Нейросеть рисует образ...</p>
+            </div>
 
-            <div class="absolute bottom-3 px-3 py-1 rounded-full bg-purple-900/80 border border-purple-500/30 text-[10px] text-purple-300 tracking-wider uppercase pointer-events-none z-10">
-                Интерактивный лук
+            <!-- Изображение лука -->
+            <img id="generatedOutfitImg" 
+                 src="{{ initial_image_url | default('/static/images/placeholder.jpg') }}" 
+                 alt="Сгенерированный образ" 
+                 class="w-full h-full object-cover rounded-xl shadow-2xl">
+
+            <div class="absolute bottom-4 px-3.5 py-1.5 rounded-full bg-purple-900/90 border border-purple-500/40 text-[10px] text-purple-200 tracking-wider uppercase pointer-events-none z-10 shadow-lg">
+                ✨ Gemini Imagen Look
             </div>
         </div>
 
@@ -74,25 +53,24 @@
     <div>
         <h3 class="text-xs font-bold uppercase tracking-wider text-purple-400 mb-3 flex items-center gap-2">
             <span>🪄</span> Конструктор образа
-            <span class="normal-case font-normal text-purple-400/60">— нажимай на вещи ниже, чтобы обновить лук</span>
+            <span class="normal-case font-normal text-purple-400/60">— выбирай вещи, и картинка обновится</span>
         </h3>
 
         {% if mode == "wardrobe" %}
             <!-- Режим гардероба -->
             <div class="rounded-2xl border border-purple-500/30 bg-purple-950/50 p-5 shadow-inner">
-                <div id="flatlayBoard" class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6 hidden">
-                    <!-- Скрытый блок старой доски, так как теперь превью прямо вверху -->
-                </div>
-
                 {% for slot in slots %}
                     {% if slot.options|length > 0 %}
                         <div class="mb-4 last:mb-0">
                             <p class="text-[11px] text-purple-400/70 mb-2">{{ slot_icons.get(slot.category, '') }} {{ category_labels.get(slot.category, slot.category) }}</p>
                             <div class="flex gap-2.5 overflow-x-auto pb-1">
                                 {% for opt in slot.options %}
+                                    {% set opt_desc = opt.description if opt.description else category_labels.get(slot.category, slot.category) %}
                                     <button type="button"
-                                        onclick="updateWardrobePart('{{ slot.category }}', '/{{ opt.photo_path }}', this)"
-                                        class="swap-{{ slot.category }} shrink-0 w-16 h-16 rounded-xl overflow-hidden border border-purple-500/30 {% if loop.first %}ring-2 ring-purple-400{% endif %} transition hover:border-purple-400"
+                                        data-slot="{{ slot.category }}"
+                                        data-label="{{ opt_desc }}"
+                                        onclick="updateWardrobePartAndRegenerate('{{ slot.category }}', this)"
+                                        class="swap-{{ slot.category }} item-btn-{{ slot.category }} shrink-0 w-16 h-16 rounded-xl overflow-hidden border border-purple-500/30 {% if loop.first %}ring-2 ring-purple-400 selected-item{% endif %} transition hover:border-purple-400"
                                         title="{{ opt.description }}">
                                         <img src="/{{ opt.photo_path }}" alt="" class="w-full h-full object-cover">
                                     </button>
@@ -115,8 +93,6 @@
         {% else %}
             <!-- Общий режим (текстовые карточки) -->
             <div class="rounded-2xl border border-purple-500/30 bg-purple-950/50 p-6 shadow-inner">
-                <div id="lookPreview" class="flex flex-col gap-3 mb-7 hidden"></div>
-
                 {% for slot in slots %}
                     <div class="mb-5 last:mb-0">
                         <p class="text-[11px] uppercase tracking-wider text-purple-400/70 mb-2">{{ slot_icons.get(slot.category, '') }} {{ category_labels.get(slot.category, slot.category) }}</p>
@@ -125,8 +101,8 @@
                                 <button type="button"
                                     data-slot="{{ slot.category }}"
                                     data-label="{{ opt }}"
-                                    onclick="pickGenericOption(this)"
-                                    class="generic-opt generic-opt-{{ slot.category }} px-4 py-2 rounded-full bg-purple-950/60 border border-purple-500/30 text-purple-200 text-xs font-medium transition hover:border-purple-400 {% if loop.first %}bg-purple-600 text-white border-purple-300{% endif %}">
+                                    onclick="pickGenericOptionAndRegenerate(this)"
+                                    class="generic-opt generic-opt-{{ slot.category }} item-btn-{{ slot.category }} px-4 py-2 rounded-full bg-purple-950/60 border border-purple-500/30 text-purple-200 text-xs font-medium transition hover:border-purple-400 {% if loop.first %}bg-purple-600 text-white border-purple-300 selected-item{% endif %}">
                                     {{ opt }}
                                 </button>
                             {% endfor %}
@@ -148,35 +124,62 @@
     </div>
 </div>
 
-<!-- Скрипт мгновенного обновления превью образа -->
+<!-- Скрипт отправки выбранных вещей на генерацию нового изображения через Imagen -->
 <script>
-    function pickGenericOption(btn) {
+    function triggerRegeneration() {
+        const selectedItems = [];
+        document.querySelectorAll('.selected-item').forEach(el => {
+            const label = el.dataset.label;
+            if (label) selectedItems.push(label);
+        });
+
+        const loader = document.getElementById('loader');
+        if (loader) loader.classList.remove('hidden');
+
+        fetch('/api/generate-look', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ items: selectedItems })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (loader) loader.classList.add('hidden');
+            if (data.success && data.image_url) {
+                const imgEl = document.getElementById('generatedOutfitImg');
+                if (imgEl) {
+                    imgEl.src = data.image_url;
+                }
+            } else {
+                alert('Ошибка генерации изображения: ' + (data.error || 'неизвестная ошибка'));
+            }
+        })
+        .catch(err => {
+            if (loader) loader.classList.add('hidden');
+            console.error('Ошибка сети:', err);
+        });
+    }
+
+    function updateWardrobePartAndRegenerate(slotCategory, btn) {
+        document.querySelectorAll('.swap-' + slotCategory).forEach(el => {
+            el.classList.remove('ring-2', 'ring-purple-400', 'selected-item');
+        });
+        btn.classList.add('ring-2', 'ring-purple-400', 'selected-item');
+        triggerRegeneration();
+    }
+
+    function pickGenericOptionAndRegenerate(btn) {
         const slot = btn.dataset.slot;
-        const label = btn.dataset.label;
 
         document.querySelectorAll('.generic-opt-' + slot).forEach(el => {
-            el.classList.remove('bg-purple-600', 'text-white', 'border-purple-300');
+            el.classList.remove('bg-purple-600', 'text-white', 'border-purple-300', 'selected-item');
             el.classList.add('bg-purple-950/60', 'text-purple-200');
         });
         btn.classList.remove('bg-purple-950/60', 'text-purple-200');
-        btn.classList.add('bg-purple-600', 'text-white', 'border-purple-300');
+        btn.classList.add('bg-purple-600', 'text-white', 'border-purple-300', 'selected-item');
 
-        // Обновляем текст внутри левого блока-визуализации
-        const canvasTextEl = document.getElementById('canvas-text-' + slot);
-        if (canvasTextEl) {
-            canvasTextEl.textContent = label;
-        }
-    }
-
-    function updateWardrobePart(slotCategory, photoSrc, btn) {
-        document.querySelectorAll('.swap-' + slotCategory).forEach(el => el.classList.remove('ring-2', 'ring-purple-400'));
-        btn.classList.add('ring-2', 'ring-purple-400');
-
-        // Мгновенно меняем картинку конкретной вещи в левом общем превью образа
-        const previewImg = document.getElementById('preview-img-' + slotCategory);
-        if (previewImg) {
-            previewImg.src = photoSrc;
-        }
+        triggerRegeneration();
     }
 </script>
 {% endblock %}
