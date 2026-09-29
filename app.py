@@ -6,9 +6,8 @@ from datetime import timedelta
 from flask import Flask, redirect, render_template, request, session, url_for, jsonify
 from werkzeug.utils import secure_filename
 
-# Импорт клиента Gemini для генерации картинок
+# Импорт актуального клиента Google GenAI SDK
 from google import genai
-# types больше не нужен для конфига генерации картинок, используем словарь
 
 from config import config
 from database import init_db
@@ -66,7 +65,7 @@ def get_session_id() -> str:
     return session["session_id"]
 
 def generate_imagen_look(items_list):
-    """Безопасная функция генерации картинки: если квота исчерпана, просто возвращаем None"""
+    """Безопасная генерация картинки лука через Gemini API. При ошибке/отсутствии квоты возвращает None."""
     if not items_list:
         return None
     
@@ -101,7 +100,7 @@ def generate_imagen_look(items_list):
                 
         return None
     except Exception as e:
-        # Логируем ошибку, но не роняем приложение — пользователь получит коллаж из одежды
+        # Логируем ошибку квоты или сети в консоль, но не рушим приложение
         print(f"Генерация картинки пропущена из-за ограничений API/квот: {e}")
         return None
 
@@ -196,7 +195,12 @@ def api_generate_look():
     image_url = generate_imagen_look(selected_items)
     if image_url:
         return jsonify({"success": True, "image_url": image_url})
-    return jsonify({"success": False, "error": "Не удалось сгенерировать изображение"}), 500
+    
+    # Отдаем статус 200 с флагом success: False вместо падения в 500
+    return jsonify({
+        "success": False, 
+        "error": "Генерация нейросетью недоступна, используется стандартный коллаж"
+    })
 
 @app.route("/outfit", methods=["GET", "POST"])
 def outfit_form():
@@ -224,11 +228,11 @@ def outfit_form():
             session_id = get_session_id()
             wardrobe_items = get_wardrobe(session_id)
             
-            # Генерация образа
+            # Генерация подбора вещей
             profile = get_profile(session_id)
             result = build_outfit(occasion, weather, wardrobe_items, profile)
 
-            # Собираем начальный список названий вещей для генерации первой картинки
+            # Собираем начальный список описаний вещей
             initial_items_desc = []
             if result.slots:
                 for slot in result.slots:
@@ -239,8 +243,8 @@ def outfit_form():
                         else:
                             initial_items_desc.append(str(opt))
 
-            # Генерируем первую картинку через Imagen
-            initial_image_url = generate_imagen_look(initial_items_desc)
+            # Попытка сгенерировать картинку нейросетью (или пустая строка при fallback)
+            initial_image_url = generate_imagen_look(initial_items_desc) or ""
 
             collage_url = None
             collage_path = None
