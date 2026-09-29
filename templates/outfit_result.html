@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="max-w-2xl mx-auto glass-panel rounded-3xl p-6 sm:p-10 border border-purple-500/30 shadow-2xl space-y-8 animate-fade-in">
+<!-- Подключаем Three.js для 3D-визуализации манекена -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<div class="max-w-4xl mx-auto glass-panel rounded-3xl p-6 sm:p-10 border border-purple-500/30 shadow-2xl space-y-8 animate-fade-in">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-6 border-b border-purple-900/40 gap-4">
         <div>
-            <h1 class="text-3xl font-black text-white mb-1">Твой образ готов</h1>
+            <h1 class="text-3xl font-black text-white mb-1">Твой 3D-манекен образа</h1>
             <p class="text-sm text-purple-300/70">Повод: <span class="text-purple-200 font-semibold">{{ occasion }}</span></p>
         </div>
         {% if weather %}
@@ -15,12 +18,26 @@
         {% endif %}
     </div>
 
-    <div>
-        <h3 class="text-xs font-bold uppercase tracking-wider text-purple-400 mb-3 flex items-center gap-2">
-            <span>✨</span> Совет стилиста
-        </h3>
-        <div class="p-5 rounded-2xl bg-purple-950/50 border border-purple-500/20 text-purple-100 text-sm leading-relaxed whitespace-pre-line shadow-inner">
-            {{ explanation }}
+    <!-- Верхняя сетка: 3D Манекен и Совет стилиста -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+        <!-- Блок 3D визуализации манекена -->
+        <div class="relative w-full aspect-square rounded-2xl border border-purple-500/30 bg-purple-950/60 overflow-hidden shadow-inner flex flex-col items-center justify-center">
+            <div id="canvas-3d-container" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+            <div class="absolute bottom-3 px-3 py-1 rounded-full bg-purple-900/80 border border-purple-500/30 text-[10px] text-purple-300 tracking-wider uppercase pointer-events-none">
+                3D Манекен (Крути мышкой)
+            </div>
+        </div>
+
+        <!-- Совет стилиста -->
+        <div class="space-y-6">
+            <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-purple-400 mb-3 flex items-center gap-2">
+                    <span>✨</span> Совет стилиста
+                </h3>
+                <div class="p-5 rounded-2xl bg-purple-950/50 border border-purple-500/20 text-purple-100 text-sm leading-relaxed whitespace-pre-line shadow-inner">
+                    {{ explanation }}
+                </div>
+            </div>
         </div>
     </div>
 
@@ -28,7 +45,7 @@
     <div>
         <h3 class="text-xs font-bold uppercase tracking-wider text-purple-400 mb-3 flex items-center gap-2">
             <span>🪄</span> Визуализация образа
-            <span class="normal-case font-normal text-purple-400/60">— нажимай на варианты, чтобы заменить вещь</span>
+            <span class="normal-case font-normal text-purple-400/60">— нажимай на варианты, манекен и образ обновятся</span>
         </h3>
 
         {% if mode == "wardrobe" %}
@@ -55,7 +72,7 @@
                             <div class="flex gap-2.5 overflow-x-auto pb-1">
                                 {% for opt in slot.options %}
                                     <button type="button"
-                                        onclick="document.getElementById('board-{{ slot.category }}').src = '/{{ opt.photo_path }}'; document.querySelectorAll('.swap-{{ slot.category }}').forEach(el => el.classList.remove('ring-2','ring-purple-400')); this.classList.add('ring-2','ring-purple-400');"
+                                        onclick="updateWardrobePart('{{ slot.category }}', '/{{ opt.photo_path }}', this)"
                                         class="swap-{{ slot.category }} shrink-0 w-16 h-16 rounded-xl overflow-hidden border border-purple-500/30 {% if opt.recommended %}ring-2 ring-purple-400{% endif %} transition hover:border-purple-400"
                                         title="{{ opt.description }}">
                                         <img src="/{{ opt.photo_path }}" alt="" class="w-full h-full object-cover">
@@ -77,7 +94,7 @@
             {% endif %}
 
         {% else %}
-            <!-- Живое превью: карточки по категориям, обновляются мгновенно при клике -->
+            <!-- Живое превью: карточки по категориям -->
             <div class="rounded-2xl border border-purple-500/30 bg-purple-950/50 p-6 shadow-inner">
                 <div id="lookPreview" class="flex flex-col gap-3 mb-7">
                     {% for slot in slots %}
@@ -110,28 +127,6 @@
                     </div>
                 {% endfor %}
             </div>
-
-            <script>
-                function pickGenericOption(btn) {
-                    const slot = btn.dataset.slot;
-                    document.querySelectorAll('.generic-opt-' + slot).forEach(function (el) {
-                        el.classList.remove('bg-purple-600', 'text-white', 'border-purple-300');
-                        el.classList.add('bg-purple-950/60', 'text-purple-200');
-                    });
-                    btn.classList.remove('bg-purple-950/60', 'text-purple-200');
-                    btn.classList.add('bg-purple-600', 'text-white', 'border-purple-300');
-
-                    const previewEl = document.getElementById('preview-' + slot);
-                    if (previewEl) {
-                        previewEl.textContent = btn.dataset.label;
-                    }
-                    const row = document.getElementById('row-' + slot);
-                    if (row) {
-                        row.classList.add('ring-2', 'ring-purple-400');
-                        setTimeout(function () { row.classList.remove('ring-2', 'ring-purple-400'); }, 450);
-                    }
-                }
-            </script>
         {% endif %}
     </div>
     {% endif %}
@@ -145,4 +140,138 @@
         </a>
     </div>
 </div>
+
+<!-- Скрипт инициализации Three.js и логики манекена -->
+<script>
+    let scene, camera, renderer, mannequinParts = {};
+    let isDragging = false;
+    let previousMousePosition = { x: 0, y: 0 };
+    let mannequinGroup;
+
+    function init3DMannequin() {
+        const container = document.getElementById('canvas-3d-container');
+        if (!container) return;
+
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(0, 0, 6.5);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+
+        const pointLight = new THREE.PointLight(0xa855f7, 1.5, 50);
+        pointLight.position.set(5, 5, 5);
+        scene.add(pointLight);
+
+        mannequinGroup = new THREE.Group();
+        scene.add(mannequinGroup);
+
+        // Голова
+        const headGeo = new THREE.SphereGeometry(0.35, 32, 32);
+        const headMat = new THREE.MeshStandardMaterial({ color: 0x4c1d95, roughness: 0.4 });
+        const head = new THREE.Mesh(headGeo, headMat);
+        head.position.set(0, 1.6, 0);
+        mannequinGroup.add(head);
+
+        // Верх (Торс)
+        const topGeo = new THREE.CylinderGeometry(0.45, 0.35, 1.1, 32);
+        const topMat = new THREE.MeshStandardMaterial({ color: 0x7c3aed, roughness: 0.3 });
+        const topMesh = new THREE.Mesh(topGeo, topMat);
+        topMesh.position.set(0, 0.75, 0);
+        mannequinGroup.add(topMesh);
+        mannequinParts['top'] = topMesh;
+        mannequinParts['dress'] = topMesh;
+        mannequinParts['outerwear'] = topMesh;
+
+        // Низ (Брюки/Юбка)
+        const bottomGeo = new THREE.CylinderGeometry(0.33, 0.3, 1.0, 32);
+        const bottomMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.5 });
+        const bottomMesh = new THREE.Mesh(bottomGeo, bottomMat);
+        bottomMesh.position.set(0, -0.3, 0);
+        mannequinGroup.add(bottomMesh);
+        mannequinParts['bottom'] = bottomMesh;
+
+        // Обувь
+        const shoesGeo = new THREE.BoxGeometry(0.7, 0.2, 0.4);
+        const shoesMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.6 });
+        const shoesMesh = new THREE.Mesh(shoesGeo, shoesMat);
+        shoesMesh.position.set(0, -0.9, 0);
+        mannequinGroup.add(shoesMesh);
+        mannequinParts['shoes'] = shoesMesh;
+
+        // Вращение мышкой
+        container.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const deltaX = e.clientX - previousMousePosition.x;
+            mannequinGroup.rotation.y += deltaX * 0.01;
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        });
+
+        window.addEventListener('mouseup', () => { isDragging = false; });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (!isDragging) {
+                mannequinGroup.rotation.y += 0.005; // Автоповорот
+            }
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            if (!container) return;
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+    }
+
+    function pickGenericOption(btn) {
+        const slot = btn.dataset.slot;
+        document.querySelectorAll('.generic-opt-' + slot).forEach(function (el) {
+            el.classList.remove('bg-purple-600', 'text-white', 'border-purple-300');
+            el.classList.add('bg-purple-950/60', 'text-purple-200');
+        });
+        btn.classList.remove('bg-purple-950/60', 'text-purple-200');
+        btn.classList.add('bg-purple-600', 'text-white', 'border-purple-300');
+
+        const previewEl = document.getElementById('preview-' + slot);
+        if (previewEl) previewEl.textContent = btn.dataset.label;
+
+        updateMannequinColor(slot, btn.dataset.label);
+    }
+
+    function updateWardrobePart(slotCategory, photoSrc, btn) {
+        const boardImg = document.getElementById('board-' + slotCategory);
+        if (boardImg) boardImg.src = photoSrc;
+
+        document.querySelectorAll('.swap-' + slotCategory).forEach(el => el.classList.remove('ring-2', 'ring-purple-400'));
+        btn.classList.add('ring-2', 'ring-purple-400');
+
+        updateMannequinColor(slotCategory, photoSrc);
+    }
+
+    function updateMannequinColor(slotCategory, seedString) {
+        if (mannequinParts[slotCategory]) {
+            let hash = 0;
+            for (let i = 0; i < seedString.length; i++) {
+                hash = seedString.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const color = new THREE.Color(`hsl(${Math.abs(hash) % 360}, 75%, 52%)`);
+            mannequinParts[slotCategory].material.color = color;
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", init3DMannequin);
+</script>
 {% endblock %}
