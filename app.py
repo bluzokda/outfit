@@ -80,9 +80,16 @@ def generate_imagen_look(items_list):
     try:
         encoded_prompt = urllib.parse.quote(prompt)
         seed = uuid.uuid4().int % 100000
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=1024&nologo=true&seed={seed}"
+        
+        # Указали бесплатную модель flux и убрали платный флаг nologo
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=1024&seed={seed}&model=flux"
 
-        response = requests.get(url, timeout=15)
+        # Передаем User-Agent, чтобы Pollinations не выдавал ошибку 402 для серверных ботов
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+
+        response = requests.get(url, headers=headers, timeout=15)
 
         if response.status_code == 200:
             os.makedirs("static/generated", exist_ok=True)
