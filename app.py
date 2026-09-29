@@ -6,7 +6,7 @@ from datetime import timedelta
 from flask import Flask, redirect, render_template, request, session, url_for, jsonify
 from werkzeug.utils import secure_filename
 
-# Официальный SDK Google GenAI
+# Импорт актуального клиента Google GenAI SDK
 from google import genai
 
 from config import config
@@ -58,69 +58,67 @@ SLOT_ICONS = {
     "accessory": "🧣",
 }
 
-
 def get_session_id() -> str:
     if "session_id" not in session:
         session["session_id"] = uuid.uuid4().hex
     session.permanent = True
     return session["session_id"]
 
-
 def generate_imagen_look(items_list):
-    """Безопасная функция генерации: при исчерпании квот возвращает None, не ломая сайт."""
+    """Безопасная генерация картинки лука через Gemini API. При ошибке/отсутствии квоты возвращает None."""
     if not items_list:
         return None
-
+    
     items_description = ", ".join(items_list)
     prompt = (
         f"Generate a professional fashion studio lookbook photography image. "
         f"A stylish full-body outfit on a model consisting of: {items_description}. "
         f"Clean minimalist background, high-end fashion magazine style, high resolution."
     )
-
+    
     try:
         client = genai.Client()
         response = client.models.generate_content(
-            model="gemini-3.1-flash-image",
+            model='gemini-3.1-flash-image',
             contents=prompt,
-            config={"response_modalities": ["IMAGE"]},
+            config={
+                'response_modalities': ['IMAGE']
+            }
         )
-
-        os.makedirs("static/generated", exist_ok=True)
+        
+        os.makedirs('static/generated', exist_ok=True)
         filename = f"outfit_{uuid.uuid4().hex[:8]}.jpg"
-        filepath = os.path.join("static/generated", filename)
-
+        filepath = os.path.join('static/generated', filename)
+        
         if response.candidates and response.candidates[0].content.parts:
             for part in response.candidates[0].content.parts:
-                if hasattr(part, "inline_data") and part.inline_data:
+                if hasattr(part, 'inline_data') and part.inline_data:
                     image_bytes = part.inline_data.data
-                    with open(filepath, "wb") as f:
+                    with open(filepath, 'wb') as f:
                         f.write(image_bytes)
                     return f"/{filepath}"
-
+                
         return None
     except Exception as e:
+        # Логируем ошибку квоты или сети в консоль, но не рушим приложение
         print(f"Генерация картинки пропущена из-за ограничений API/квот: {e}")
         return None
 
-
 @app.context_processor
 def inject_profile_flag():
+    """Флаг для шаблонов: заполнен ли профиль (чтобы показать подсказку)."""
     sid = session.get("session_id")
     profile = get_profile(sid) if sid else None
     return {"has_profile": bool(profile and (profile.get("gender") or profile.get("age")))}
-
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
-
 @app.route("/wardrobe")
 def wardrobe():
     items = get_wardrobe(get_session_id())
     return render_template("wardrobe.html", items=items, category_labels=CATEGORY_LABELS)
-
 
 @app.route("/wardrobe/add", methods=["GET", "POST"])
 def add_item():
@@ -144,7 +142,6 @@ def add_item():
 
     return render_template("add_item.html", category_labels=CATEGORY_LABELS)
 
-
 @app.route("/wardrobe/delete/<int:item_id>", methods=["POST"])
 def delete_item(item_id):
     session_id = get_session_id()
@@ -155,7 +152,6 @@ def delete_item(item_id):
         except Exception:
             pass
     return redirect(url_for("wardrobe"))
-
 
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
@@ -190,22 +186,21 @@ def settings():
         saved=request.args.get("saved"),
     )
 
-
 @app.route("/api/generate-look", methods=["POST"])
 def api_generate_look():
-    """Возвращает статус 200 с флагом успеха/неудачи вместо вызова 500 ошибки."""
+    """Эндпоинт для JS-асинхронного обновления картинки при клике на вещи"""
     data = request.get_json() or {}
     selected_items = data.get("items", [])
-
+    
     image_url = generate_imagen_look(selected_items)
     if image_url:
         return jsonify({"success": True, "image_url": image_url})
-
+    
+    # Отдаем статус 200 с флагом success: False вместо падения в 500
     return jsonify({
-        "success": False,
-        "error": "Генерация нейросетью временно недоступна, используется коллаж",
+        "success": False, 
+        "error": "Генерация нейросетью недоступна, используется стандартный коллаж"
     })
-
 
 @app.route("/outfit", methods=["GET", "POST"])
 def outfit_form():
@@ -232,23 +227,23 @@ def outfit_form():
 
             session_id = get_session_id()
             wardrobe_items = get_wardrobe(session_id)
-
+            
+            # Генерация подбора вещей
             profile = get_profile(session_id)
             result = build_outfit(occasion, weather, wardrobe_items, profile)
 
+            # Собираем начальный список описаний вещей
             initial_items_desc = []
             if result.slots:
                 for slot in result.slots:
                     if slot.get("options"):
                         opt = slot["options"][0]
                         if isinstance(opt, dict):
-                            initial_items_desc.append(
-                                opt.get("description", CATEGORY_LABELS.get(slot["category"], slot["category"]))
-                            )
+                            initial_items_desc.append(opt.get("description", CATEGORY_LABELS.get(slot["category"], slot["category"])))
                         else:
                             initial_items_desc.append(str(opt))
 
-            # При невозможности сгенерировать картинку подставляется пустая строка, избегая вызова /None
+            # Попытка сгенерировать картинку нейросетью (или пустая строка при fallback)
             initial_image_url = generate_imagen_look(initial_items_desc) or ""
 
             collage_url = None
@@ -293,7 +288,6 @@ def outfit_form():
             """, 500
 
     return render_template("outfit_form.html")
-
 
 if __name__ == "__main__":
     init_db()
