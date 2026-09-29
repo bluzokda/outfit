@@ -66,7 +66,7 @@ def get_session_id() -> str:
     return session["session_id"]
 
 def generate_imagen_look(items_list):
-    """Генерация картинки лука через актуальную модель Gemini"""
+    """Генерация картинки лука через модель Gemini с поддержкой изображений"""
     if not items_list:
         return None
     
@@ -79,12 +79,12 @@ def generate_imagen_look(items_list):
     
     try:
         client = genai.Client()
-        # Используем модель, указанную в сообщении об ошибке Google
+        # Используем актуальную модель для генерации изображений
         response = client.models.generate_content(
-            model='gemini-3.8-flash',
+            model='gemini-3.1-flash-image',
             contents=prompt,
             config={
-                'response_modalities': ['IMAGE', 'TEXT']
+                'response_modalities': ['IMAGE']
             }
         )
         
@@ -92,7 +92,6 @@ def generate_imagen_look(items_list):
         filename = f"outfit_{uuid.uuid4().hex[:8]}.jpg"
         filepath = os.path.join('static/generated', filename)
         
-        # Проверяем наличие частей ответа с изображением
         if response.candidates and response.candidates[0].content.parts:
             for part in response.candidates[0].content.parts:
                 if hasattr(part, 'inline_data') and part.inline_data:
