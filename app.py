@@ -66,7 +66,10 @@ def get_session_id() -> str:
 
 
 def generate_imagen_look(items_list):
-    """Генерация картинки лука через бесплатный сервис Pollinations.ai"""
+    """Формирует прямую URL-ссылку для Pollinations.ai.
+    Загрузка происходит напрямую в браузере пользователя,
+    что обходит блокировки IP-адресов Render (402/500).
+    """
     if not items_list:
         return None
 
@@ -81,27 +84,10 @@ def generate_imagen_look(items_list):
         encoded_prompt = urllib.parse.quote(prompt)
         seed = uuid.uuid4().int % 100000
         
-        # Указали бесплатную модель flux и убрали платный флаг nologo
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=1024&seed={seed}&model=flux"
-
-        # Передаем User-Agent, чтобы Pollinations не выдавал ошибку 402 для серверных ботов
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-
-        response = requests.get(url, headers=headers, timeout=15)
-
-        if response.status_code == 200:
-            os.makedirs("static/generated", exist_ok=True)
-            filename = f"outfit_{uuid.uuid4().hex[:8]}.jpg"
-            filepath = os.path.join("static/generated", filename)
-
-            with open(filepath, "wb") as f:
-                f.write(response.content)
-
-            return f"/{filepath.replace(os.sep, '/')}"
-
-        print(f"Pollinations вернул статус: {response.status_code}")
+        # Возвращаем прямую ссылку для тега <img> в браузере
+        return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=1024&seed={seed}&model=flux"
+    except Exception as e:
+        print(f"Ошибка формирования ссылки генерации: {e}")
         return None
 
     except Exception as e:
