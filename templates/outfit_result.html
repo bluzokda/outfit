@@ -27,7 +27,7 @@
 
             <!-- Изображение лука -->
             <img id="generatedOutfitImg" 
-                 src="{{ initial_image_url | default('/static/images/placeholder.jpg') }}" 
+                 src="{{ initial_image_url | default('/static/images/placeholder.jpg', true) }}"
                  alt="Сгенерированный образ" 
                  class="w-full h-full object-cover rounded-xl shadow-2xl">
 
