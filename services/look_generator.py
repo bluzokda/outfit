@@ -1,18 +1,14 @@
-import os
-import uuid
+import base64
 import gc
+import os
 import re
-import requests
+import time
 import urllib.parse
-from config import config
+import uuid
 
-# Если установлен пакет google-genai / google-generativeai
-try:
-    from google import genai
-    from google.genai import types
-    HAS_GENAI = True
-except ImportError:
-    HAS_GENAI = False
+import requests
+
+from config import config
 
 TRANSLATIONS = {
     "легкий пуховик": "light down jacket",
@@ -30,6 +26,19 @@ TRANSLATIONS = {
     "аксессуар": "accessory",
 }
 
+# Модели генерации изображений, доступные на обычном Gemini Developer API
+# (НЕ Imagen 3/4 и НЕ Interactions API — они требуют платный тариф / Vertex).
+# Порядок — по приоритету; недоступная модель (404) пропускается.
+IMAGE_MODELS = [
+    os.getenv("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image"),
+    "gemini-2.5-flash-image-preview",
+    "gemini-3.1-flash-image-preview",
+]
+
+GENERATE_CONTENT_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+
+
 def clean_and_translate_prompt(items_description: list[str]) -> str:
     translated_items = []
     for item in (items_description or []):
@@ -43,6 +52,108 @@ def clean_and_translate_prompt(items_description: list[str]) -> str:
     result = ", ".join(translated_items)
     return result if result else "stylish modern casual streetwear outfit"
 
+
+def _extract_image_bytes(data: dict) -> bytes | None:
+    """Достаёт base64-картинку из ответа generateContent."""
+    for candidate in data.get("candidates", []):
+        for part in (candidate.get("content") or {}).get("parts", []):
+            inline = part.get("inlineData") or part.get("inline_data")
+            if inline and inline.get("data"):
+                try:
+                    return base64.b64decode(inline["data"])
+                except Exception:
+                    continue
+    return None
+
+
+def _generate_with_gemini(prompt: str, api_key: str) -> bytes | None:
+    """Генерация через Gemini generateContent (работает на Developer API,
+    в т.ч. на бесплатном тарифе). С ретраями на 429/503."""
+    for model in IMAGE_MODELS:
+        if not model:
+            continue
+        url = GENERATE_CONTENT_URL.format(model=model)
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "responseModalities": ["TEXT", "IMAGE"],
+                "imageConfig": {"aspectRatio": "3:4"},
+            },
+        }
+        for attempt in range(3):
+            try:
+                resp = requests.post(
+                    url,
+                    headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+                    json=payload,
+                    timeout=90,
+                )
+
+                if resp.status_code == 404:
+                    print(f"Gemini image: модель {model} недоступна (404), пробую следующую")
+                    break  # следующая модель
+
+                if resp.status_code == 400 and "imageConfig" in payload["generationConfig"]:
+                    # Старая модель может не знать imageConfig — повтор без него
+                    print(f"Gemini image ({model}): 400 на imageConfig, повтор без aspectRatio")
+                    payload["generationConfig"].pop("imageConfig", None)
+                    continue
+
+                if resp.status_code in RETRYABLE_STATUS:
+                    wait = 3 * (2 ** attempt)
+                    print(f"Gemini image ({model}): {resp.status_code}, ретрай {attempt + 1}/3 через {wait}с")
+                    time.sleep(wait)
+                    continue
+
+                resp.raise_for_status()
+                image_bytes = _extract_image_bytes(resp.json())
+                if image_bytes:
+                    print(f"Gemini image: успех на модели {model}")
+                    return image_bytes
+
+                print(f"Gemini image ({model}): ответ без картинки, пробую следующую модель")
+                break  # следующая модель
+
+            except requests.exceptions.RequestException as e:
+                wait = 3 * (2 ** attempt)
+                print(f"Gemini image ({model}): сетевая ошибка {e}, ретрай {attempt + 1}/3 через {wait}с")
+                time.sleep(wait)
+
+    return None
+
+
+def _generate_with_pollinations(prompt: str) -> bytes | None:
+    """Фолбэк на Pollinations с ретраями (flux -> turbo)."""
+    encoded_prompt = urllib.parse.quote(prompt)
+
+    for model in ("flux", "turbo"):
+        for attempt in range(2):
+            seed = uuid.uuid4().int % 1000000
+            url = (
+                f"https://image.pollinations.ai/prompt/{encoded_prompt}"
+                f"?width=768&height=1024&seed={seed}&model={model}&nologo=true&private=true"
+            )
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    f"(KHTML, like Gecko) Chrome/{100 + (seed % 20)}.0.0.0 Safari/537.36"
+                ),
+                "Accept": "image/jpeg,image/png,*/*",
+                "Cache-Control": "no-cache",
+            }
+            try:
+                response = requests.get(url, headers=headers, timeout=60)
+                if response.ok and len(response.content) > 10000:
+                    print(f"Pollinations ({model}): успех")
+                    return response.content
+                print(f"Pollinations ({model}): {response.status_code}, попытка {attempt + 1}/2")
+            except requests.exceptions.RequestException as e:
+                print(f"Pollinations ({model}): {e}, попытка {attempt + 1}/2")
+            time.sleep(2 * (attempt + 1))
+
+    return None
+
+
 def generate_imagen_look(gender: str = None, age: int = None, items_description: list[str] = None, occasion: str = "") -> str | None:
     """Универсальная стабильная генерация фото одежды."""
     clean_clothes = clean_and_translate_prompt(items_description)
@@ -54,55 +165,20 @@ def generate_imagen_look(gender: str = None, age: int = None, items_description:
         f"Full growth portrait, standing posture, minimalist photo studio background, highly detailed fabric texture, realistic lighting, 8k"
     )
 
-    # 1. Попытка сгенерировать через Google Imagen 3 (если задан GEMINI_API_KEY)
+    # 1. Gemini generateContent (Nano Banana) — работает на обычном API-ключе
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    if gemini_key and HAS_GENAI:
-        try:
-            client = genai.Client(api_key=gemini_key)
-            result = client.models.generate_images(
-                model='imagen-3.0-generate-002',
-                prompt=prompt,
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
-                    aspect_ratio="3:4",
-                    output_mime_type="image/jpeg"
-                )
-            )
-            for generated_image in result.generated_images:
-                return save_image(generated_image.image.image_bytes)
-        except Exception as e:
-            print(f"Gemini Imagen Error: {e}")
+    if gemini_key:
+        image_bytes = _generate_with_gemini(prompt, gemini_key)
+        if image_bytes:
+            return save_image(image_bytes)
 
-    # 2. Прямая генерация через смену провайдера (запрос с ротацией IP / User-Agent)
-    try:
-        seed = uuid.uuid4().int % 1000000
-        encoded_prompt = urllib.parse.quote(prompt)
-        
-        # Обход лимитов за счет уникального сеанса
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=1024&seed={seed}&model=flux&nologo=true&private=true"
-        
-        headers = {
-            "User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{100 + (seed % 20)}.0.0.0 Safari/537.36",
-            "Accept": "image/jpeg,image/png,*/*",
-            "Cache-Control": "no-cache"
-        }
-
-        response = requests.get(url, headers=headers, timeout=45)
-
-        if response.ok and len(response.content) > 10000:
-            return save_image(response.content)
-
-        # Резервный сервер без модели flux (модель turbo)
-        url_turbo = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=1024&seed={seed}&model=turbo&nologo=true"
-        response_turbo = requests.get(url_turbo, headers=headers, timeout=45)
-        
-        if response_turbo.ok and len(response_turbo.content) > 10000:
-            return save_image(response_turbo.content)
-
-    except Exception as e:
-        print(f"Ошибка генерации: {e}")
+    # 2. Фолбэк: Pollinations
+    image_bytes = _generate_with_pollinations(prompt)
+    if image_bytes:
+        return save_image(image_bytes)
 
     return None
+
 
 def save_image(image_bytes: bytes) -> str | None:
     """Сохраняет полученные байты изображения в файл."""
