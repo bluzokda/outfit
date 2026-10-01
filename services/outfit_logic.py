@@ -1,6 +1,4 @@
 import json
-import time
-
 import requests
 
 from config import config
@@ -8,16 +6,6 @@ from services.weather import WeatherInfo
 
 
 SLOT_CATEGORIES = ("outerwear", "top", "bottom", "dress", "shoes", "accessory")
-
-GENERATE_CONTENT_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-RETRYABLE_STATUS = {429, 500, 502, 503, 504}
-
-# Модели для текстового стилиста: первая доступная побеждает
-TEXT_MODELS = [
-    config.gemini_text_model,
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-]
 
 
 class OutfitResult:
@@ -103,81 +91,55 @@ def _apply_profile_filter(items, profile):
     return items
 
 
-def _fallback_result(text: str) -> dict:
-    """Безопасный фолбэк со всеми ключами сразу — подходит и для режима
-    'с гардеробом', и для режима 'с нуля'."""
-    return {
-        "explanation": text,
-        "item_ids": [],
-        "slots": [],
-        "recommendations": [],
-    }
-
-
 def _call_gemini(prompt: str, schema: dict) -> dict:
-    """Запрос к Gemini через стандартный generateContent API
-    (работает на обычном Developer API-ключе, Interactions API не нужен).
-    С ретраями на 429/503 и перебором моделей."""
-    if not config.gemini_api_key:
-        print("Gemini API key не задан")
-        return _fallback_result("ИИ-стилист не настроен: не задан GEMINI_API_KEY.")
+    """Запрос через актуальный Gemini Interactions API с защитой от ошибок (например, 503).
+    Фолбэк содержит все возможные ключи сразу, чтобы одинаково безопасно
+    подходить и для режима "с гардеробом", и для режима "с нуля"."""
+    try:
+        response = requests.post(
+            config.gemini_api_url,
+            headers={
+                "x-goog-api-key": config.gemini_api_key,
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "gemini-3.5-flash-lite",
+                "input": prompt,
+                "response_format": {
+                    "type": "text",
+                    "mime_type": "application/json",
+                    "schema": schema,
+                },
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
 
-    for model in TEXT_MODELS:
-        if not model:
-            continue
-        url = GENERATE_CONTENT_URL.format(model=model)
-        for attempt in range(3):
-            try:
-                response = requests.post(
-                    url,
-                    headers={
-                        "x-goog-api-key": config.gemini_api_key,
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "contents": [{"parts": [{"text": prompt}]}],
-                        "generationConfig": {
-                            "responseMimeType": "application/json",
-                            "responseSchema": schema,
-                            "temperature": 0.7,
-                        },
-                    },
-                    timeout=45,
-                )
+        for step in data.get("steps", []):
+            if step.get("type") == "model_output":
+                for block in step.get("content", []):
+                    if block.get("type") == "text":
+                        return json.loads(block["text"])
 
-                if response.status_code == 404:
-                    print(f"Gemini text: модель {model} недоступна (404), пробую следующую")
-                    break  # следующая модель
+        raise ValueError(f"Не удалось извлечь ответ от Gemini: {data}")
 
-                if response.status_code in RETRYABLE_STATUS:
-                    wait = 3 * (2 ** attempt)
-                    print(f"Gemini text ({model}): {response.status_code}, ретрай {attempt + 1}/3 через {wait}с")
-                    time.sleep(wait)
-                    continue
-
-                response.raise_for_status()
-                data = response.json()
-
-                for candidate in data.get("candidates", []):
-                    for part in (candidate.get("content") or {}).get("parts", []):
-                        text = part.get("text")
-                        if text:
-                            return json.loads(text)
-
-                print(f"Gemini text ({model}): ответ без текста, пробую следующую модель")
-                break  # следующая модель
-
-            except json.JSONDecodeError as e:
-                print(f"Gemini text ({model}): не удалось распарсить JSON: {e}")
-                break  # следующая модель
-            except requests.exceptions.RequestException as e:
-                wait = 3 * (2 ** attempt)
-                print(f"Gemini text ({model}): сетевая ошибка {e}, ретрай {attempt + 1}/3 через {wait}с")
-                time.sleep(wait)
-
-    return _fallback_result(
-        "В данный момент ИИ-стилист перегружен. Попробуйте сгенерировать образ ещё раз через несколько секунд."
-    )
+    except requests.exceptions.HTTPError as e:
+        print(f"Ошибка Gemini API (возможно, 503/429): {e}")
+        return {
+            "explanation": "В данный момент ИИ-стилист перегружен. Попробуйте сгенерировать образ ещё раз через несколько секунд.",
+            "item_ids": [],
+            "slots": [],
+            "recommendations": [],
+        }
+    except Exception as e:
+        print(f"Непредвиденная ошибка при запросе к ИИ: {e}")
+        return {
+            "explanation": "Произошла временная ошибка при обращении к нейросети. Попробуйте повторить запрос.",
+            "item_ids": [],
+            "slots": [],
+            "recommendations": [],
+        }
 
 
 def _build_wardrobe_slots(filtered_items, picked_ids):
